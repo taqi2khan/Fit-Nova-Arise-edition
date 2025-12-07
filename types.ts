@@ -87,6 +87,7 @@ export interface AuthContextType {
   logout: () => void;
   completeQuest: (id: string) => void;
   updateQuestProgress: (questId: string, objectiveIndex: number, newCurrent: number) => void;
+  addQuest: (quest: Quest) => void;
   notify: (title: string, message: string, type?: SystemNotificationData['type']) => void;
   clearNotification: () => void;
 }

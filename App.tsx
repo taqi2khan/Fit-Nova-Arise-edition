@@ -8,7 +8,7 @@ import { QuestCard } from './components/QuestCard';
 import { User, Quest, SystemNotificationData, UserStats, Rank, SystemState, AuthContextType } from './types';
 import { MOCK_USER, MOCK_QUESTS, INITIAL_STATS } from './constants';
 import { motion, AnimatePresence } from 'framer-motion';
-import { generateSystemMessage } from './services/geminiService';
+import { generateSystemMessage, generateQuest } from './services/geminiService';
 import { StatRadar } from './components/StatRadar';
 import { SystemLog } from './components/SystemLog';
 import { PlayerAvatar } from './components/PlayerAvatar';
@@ -142,6 +142,10 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
       notify("SYSTEM LOGOUT", "Goodbye, Hunter.", "INFO");
   };
 
+  const addQuest = (quest: Quest) => {
+    setQuests(prev => [quest, ...prev]);
+  };
+
   // Updates the progress of a specific objective in a quest
   const updateQuestProgress = (questId: string, objectiveIndex: number, newCurrent: number) => {
     setQuests(prevQuests => prevQuests.map(q => {
@@ -261,7 +265,7 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   }, [user]);
 
   return (
-    <AuthContext.Provider value={{ user, quests, login, register, logout, completeQuest, updateQuestProgress, notify, clearNotification }}>
+    <AuthContext.Provider value={{ user, quests, login, register, logout, completeQuest, updateQuestProgress, addQuest, notify, clearNotification }}>
       <ParticleCursor />
       {children}
       <SystemNotification notification={notification} onClear={clearNotification} />
@@ -540,9 +544,10 @@ const LandingPage: React.FC = () => {
 };
 
 const Dashboard: React.FC = () => {
-  const { user, quests, completeQuest, updateQuestProgress, logout } = useAuth();
+  const { user, quests, completeQuest, updateQuestProgress, logout, addQuest, notify } = useAuth();
   const [selectedQuestId, setSelectedQuestId] = useState<string | null>(null);
   const [isBooting, setIsBooting] = useState(true);
+  const [isGeneratingQuest, setIsGeneratingQuest] = useState(false);
   
   if (!user) return <Navigate to="/" />;
 
@@ -553,6 +558,37 @@ const Dashboard: React.FC = () => {
 
   // Check for incomplete DAILY quests for the Penalty Timer
   const hasIncompleteDaily = quests.some(q => q.type === 'DAILY' && !q.completed);
+
+  const handleQuestGeneration = async () => {
+    if (isGeneratingQuest) return;
+    setIsGeneratingQuest(true);
+    notify("SYSTEM SCAN", "Analyzing player biometrics for new scenario...", "INFO");
+
+    const partialQuest = await generateQuest(user);
+    
+    if (partialQuest) {
+      // Map partial to full quest
+      const newQuest: Quest = {
+        id: `AI_QUEST_${Date.now()}`,
+        title: partialQuest.title || "UNKNOWN QUEST",
+        description: partialQuest.description || "No data.",
+        objectives: partialQuest.objectives?.map(o => ({...o, current: 0})) || [],
+        difficulty: partialQuest.difficulty || 'E',
+        xpReward: partialQuest.xpReward || 50,
+        statRewards: partialQuest.statRewards || {},
+        completed: false,
+        type: partialQuest.type || 'SUDDEN',
+        penalty: partialQuest.penalty
+      };
+
+      addQuest(newQuest);
+      notify("NEW QUEST RECEIVED", `Scenario: ${newQuest.title}`, "SYSTEM_ALERT");
+    } else {
+      notify("SCAN FAILED", "Unable to generate quest scenario.", "WARNING");
+    }
+    
+    setIsGeneratingQuest(false);
+  };
 
   return (
     <>
@@ -661,15 +697,40 @@ const Dashboard: React.FC = () => {
               
               {/* ACTIVE QUESTS (Top half) */}
               <div className="flex flex-col h-[50%] min-h-[300px]">
-                <h2 className="text-xl font-orbitron text-white mb-4 flex items-center gap-4 border-b border-gray-800 pb-2">
-                    <span className="w-2 h-6 bg-neon-blue"></span>
-                    ACTIVE QUESTS
-                </h2>
+                <div className="mb-4 border-b border-gray-800 pb-2 flex items-center justify-between">
+                   <h2 className="text-xl font-orbitron text-white flex items-center gap-4">
+                      <span className="w-2 h-6 bg-neon-blue"></span>
+                      ACTIVE QUESTS
+                   </h2>
+                   
+                   <button 
+                     onClick={handleQuestGeneration}
+                     disabled={isGeneratingQuest}
+                     className={`text-[10px] font-mono border px-3 py-1 uppercase tracking-wider transition-all duration-300 flex items-center gap-2 ${
+                        isGeneratingQuest 
+                          ? 'border-gray-700 text-gray-500 cursor-wait'
+                          : 'border-neon-blue text-neon-blue hover:bg-neon-blue hover:text-black shadow-[0_0_10px_rgba(0,243,255,0.2)]'
+                     }`}
+                   >
+                     {isGeneratingQuest ? (
+                        <>
+                           <span className="animate-spin">⟳</span> SCANNING...
+                        </>
+                     ) : (
+                        <>
+                           <span>+</span> SYSTEM SCAN
+                        </>
+                     )}
+                   </button>
+                </div>
 
                 <div className="space-y-4 overflow-y-auto pr-2 custom-scrollbar flex-grow">
                     {quests.map((quest) => (
                         <motion.div
                         key={quest.id}
+                        layout
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
                         whileHover={{ scale: 1.01, x: 5 }}
                         onClick={() => setSelectedQuestId(quest.id)}
                         className={`cursor-pointer border-l-2 p-5 bg-black/40 hover:bg-neon-blue/5 transition-all relative overflow-hidden ${

@@ -39,7 +39,7 @@ interface SystemWindowProps {
 }
 
 export const SystemWindow: React.FC<SystemWindowProps> = ({ children, title, subtitle, className = "", variant = 'blue', footer }) => {
-  const colorClass = variant === 'blue' ? 'border-neon-blue shadow-[0_0_20px_rgba(0,243,255,0.2)]' : 'border-red-600 shadow-[0_0_20px_rgba(220,38,38,0.2)]';
+  const colorClass = variant === 'blue' ? 'border-neon-blue shadow-[0_0_20px_rgba(var(--neon-blue-rgb),0.2)]' : 'border-red-600 shadow-[0_0_20px_rgba(220,38,38,0.2)]';
   const textClass = variant === 'blue' ? 'text-neon-blue' : 'text-red-500';
   const glowClass = variant === 'blue' ? 'bg-neon-blue' : 'bg-red-500';
 
@@ -77,7 +77,7 @@ export const SystemWindow: React.FC<SystemWindowProps> = ({ children, title, sub
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.5 }}
-                    className={`text-xs font-mono uppercase tracking-widest mt-2 ${variant === 'blue' ? 'text-cyan-200/70' : 'text-red-200/70'}`}
+                    className={`text-xs font-mono uppercase tracking-widest mt-2 ${variant === 'blue' ? 'text-neon-blue/70' : 'text-red-200/70'}`}
                 >
                     {subtitle}
                 </motion.p>
@@ -134,7 +134,7 @@ export const SystemInput: React.FC<SystemInputProps> = ({ label, readOnly, error
   return (
     <div className="mb-4">
       <div className="flex justify-between items-end mb-2">
-        <label className="block text-neon-blue text-xs font-orbitron uppercase tracking-wider drop-shadow-[0_0_5px_rgba(0,243,255,0.8)]">
+        <label className="block text-neon-blue text-xs font-orbitron uppercase tracking-wider drop-shadow-[0_0_5px_rgba(var(--neon-blue-rgb),0.8)]">
             {label}
         </label>
         {/* Validation Message */}
@@ -153,7 +153,7 @@ export const SystemInput: React.FC<SystemInputProps> = ({ label, readOnly, error
           animate={{
              boxShadow: error 
                ? ["0 0 0px rgba(220,38,38,0)", "0 0 5px rgba(220,38,38,0.2)", "0 0 0px rgba(220,38,38,0)"]
-               : ["0 0 0px rgba(0,243,255,0)", "0 0 5px rgba(0,243,255,0.15)", "0 0 0px rgba(0,243,255,0)"]
+               : ["0 0 0px rgba(var(--neon-blue-rgb),0)", "0 0 5px rgba(var(--neon-blue-rgb),0.15)", "0 0 0px rgba(var(--neon-blue-rgb),0)"]
           }}
           transition={{
              duration: 3,
@@ -163,8 +163,8 @@ export const SystemInput: React.FC<SystemInputProps> = ({ label, readOnly, error
           whileFocus={{
              boxShadow: error 
                ? "0 0 15px rgba(220,38,38,0.5)" 
-               : "0 0 15px rgba(0,243,255,0.5)",
-             borderColor: error ? "rgb(239,68,68)" : "rgb(0,243,255)",
+               : "0 0 15px rgba(var(--neon-blue-rgb),0.5)",
+             borderColor: error ? "rgb(239,68,68)" : "var(--neon-blue)",
              scale: 1.005
           }}
           className={`w-full bg-black/50 border ${borderColor} ${textColor} font-mono px-4 py-3 focus:outline-none transition-all rounded-none placeholder-gray-600
@@ -193,7 +193,7 @@ interface SystemButtonProps extends HTMLMotionProps<"button"> {
 
 export const SystemButton: React.FC<SystemButtonProps> = ({ children, variant = 'primary', className = "", disabled, ...props }) => {
   const variants = {
-    primary: "bg-neon-blue/10 border border-neon-blue text-neon-blue hover:bg-neon-blue hover:text-black shadow-[0_0_15px_rgba(0,243,255,0.3)]",
+    primary: "bg-neon-blue/10 border border-neon-blue text-neon-blue hover:bg-neon-blue hover:text-black shadow-[0_0_15px_rgba(var(--neon-blue-rgb),0.3)]",
     secondary: "bg-transparent border border-gray-600 text-gray-400 hover:border-white hover:text-white",
     danger: "bg-red-900/20 border border-red-500 text-red-500 hover:bg-red-600 hover:text-white shadow-[0_0_15px_rgba(220,38,38,0.3)]"
   };

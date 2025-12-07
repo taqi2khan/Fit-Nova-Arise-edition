@@ -12,8 +12,8 @@
           extend: {
             colors: {
               neon: {
-                blue: '#00f3ff',
-                purple: '#bc13fe',
+                blue: 'var(--neon-blue)',
+                purple: 'var(--neon-purple)',
                 dark: '#050505',
                 grid: '#0a0a1a'
               }
@@ -55,13 +55,37 @@
       }
     </script>
     <style>
+      :root {
+        /* Default SYSTEM Theme (Cyan/Purple) */
+        --neon-blue: #00f3ff;
+        --neon-purple: #bc13fe;
+        --neon-blue-rgb: 0, 243, 255;
+        --neon-purple-rgb: 188, 19, 254;
+      }
+
+      /* SHADOW Theme (Purple/Blue) - Solo Leveling Shadow Monarch Style */
+      body.theme-shadow {
+        --neon-blue: #a855f7; /* Purple 500 */
+        --neon-purple: #3b82f6; /* Blue 500 */
+        --neon-blue-rgb: 168, 85, 247;
+        --neon-purple-rgb: 59, 130, 246;
+      }
+
+      /* RULER Theme (Gold/Red) - Divine/Royal Style */
+      body.theme-ruler {
+        --neon-blue: #fbbf24; /* Amber 400 */
+        --neon-purple: #f43f5e; /* Rose 500 */
+        --neon-blue-rgb: 251, 191, 36;
+        --neon-purple-rgb: 244, 63, 94;
+      }
+
       body {
         background-color: #050505;
         color: #e0e0e0;
         overflow-x: hidden;
       }
       ::selection {
-        background: #00f3ff;
+        background: var(--neon-blue);
         color: #000;
       }
       /* Custom Scrollbar for the System Look */
@@ -72,11 +96,11 @@
         background: #050505; 
       }
       ::-webkit-scrollbar-thumb {
-        background: #00f3ff; 
+        background: var(--neon-blue); 
         border-radius: 4px;
       }
       ::-webkit-scrollbar-thumb:hover {
-        background: #bc13fe; 
+        background: var(--neon-purple); 
       }
       
       /* Glitch Utilities */

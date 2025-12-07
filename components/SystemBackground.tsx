@@ -9,8 +9,8 @@ export const SystemBackground: React.FC = () => {
       <div className="absolute inset-0 opacity-20"
         style={{
           backgroundImage: `
-            linear-gradient(to right, #00f3ff 1px, transparent 1px),
-            linear-gradient(to bottom, #00f3ff 1px, transparent 1px)
+            linear-gradient(to right, var(--neon-blue) 1px, transparent 1px),
+            linear-gradient(to bottom, var(--neon-blue) 1px, transparent 1px)
           `,
           backgroundSize: '40px 40px',
           transform: 'perspective(500px) rotateX(60deg) translateY(-100px) scale(3)',
@@ -24,7 +24,7 @@ export const SystemBackground: React.FC = () => {
          <motion.div 
             animate={{ rotate: 360 }}
             transition={{ duration: 60, repeat: Infinity, ease: "linear" }}
-            className="w-[90vh] h-[90vh] rounded-full border border-neon-blue border-dashed shadow-[0_0_50px_rgba(0,243,255,0.2)]"
+            className="w-[90vh] h-[90vh] rounded-full border border-neon-blue border-dashed shadow-[0_0_50px_rgba(var(--neon-blue-rgb),0.2)]"
          />
          {/* Middle Ring (Counter-rotate) */}
          <motion.div 
