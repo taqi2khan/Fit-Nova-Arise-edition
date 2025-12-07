@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FitNova – Arise Edition</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              neon: {
+                blue: '#00f3ff',
+                purple: '#bc13fe',
+                dark: '#050505',
+                grid: '#0a0a1a'
+              }
+            },
+            fontFamily: {
+              mono: ['"Share Tech Mono"', 'monospace'],
+              orbitron: ['"Orbitron"', 'sans-serif'],
+            },
+            animation: {
+              'pulse-fast': 'pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+              'scanline': 'scanline 8s linear infinite',
+              'glitch-1': 'glitch-anim-1 2.5s infinite linear alternate-reverse',
+              'glitch-2': 'glitch-anim-2 3s infinite linear alternate-reverse',
+            },
+            keyframes: {
+              scanline: {
+                '0%': { transform: 'translateY(-100%)' },
+                '100%': { transform: 'translateY(100%)' }
+              },
+              'glitch-anim-1': {
+                '0%': { 'clip-path': 'inset(20% 0 80% 0)' },
+                '20%': { 'clip-path': 'inset(60% 0 1% 0)' },
+                '40%': { 'clip-path': 'inset(40% 0 50% 0)' },
+                '60%': { 'clip-path': 'inset(80% 0 5% 0)' },
+                '80%': { 'clip-path': 'inset(10% 0 70% 0)' },
+                '100%': { 'clip-path': 'inset(30% 0 20% 0)' }
+              },
+              'glitch-anim-2': {
+                '0%': { 'clip-path': 'inset(10% 0 60% 0)' },
+                '20%': { 'clip-path': 'inset(30% 0 10% 0)' },
+                '40%': { 'clip-path': 'inset(70% 0 25% 0)' },
+                '60%': { 'clip-path': 'inset(15% 0 80% 0)' },
+                '80%': { 'clip-path': 'inset(55% 0 10% 0)' },
+                '100%': { 'clip-path': 'inset(45% 0 35% 0)' }
+              }
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+      body {
+        background-color: #050505;
+        color: #e0e0e0;
+        overflow-x: hidden;
+      }
+      ::selection {
+        background: #00f3ff;
+        color: #000;
+      }
+      /* Custom Scrollbar for the System Look */
+      ::-webkit-scrollbar {
+        width: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #050505; 
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #00f3ff; 
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #bc13fe; 
+      }
+      
+      /* Glitch Utilities */
+      .glitch-layer {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 9999;
+        mix-blend-mode: hard-light;
+        opacity: 0.5;
+        background: transparent;
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://aistudiocdn.com/react@^19.2.1/",
+    "react": "https://aistudiocdn.com/react@^19.2.1",
+    "react-router-dom": "https://aistudiocdn.com/react-router-dom@^7.10.1",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.1/",
+    "framer-motion": "https://aistudiocdn.com/framer-motion@^12.23.25",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.31.0"
+  }
+}
+</script>
+</head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
