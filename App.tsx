@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { SystemBackground } from './components/SystemBackground';
@@ -21,6 +22,9 @@ import { ShadowExtraction } from './components/ShadowExtraction';
 import { PenaltyTimer } from './components/PenaltyTimer';
 import { SleepVisualizer } from './components/SleepVisualizer';
 import { WorkoutHeatmap } from './components/WorkoutHeatmap';
+import { JobChangeWidget } from './components/JobChangeWidget';
+import { HunterIDCard } from './components/HunterIDCard';
+import { LevelUpOverlay } from './components/LevelUpOverlay';
 
 // --- MOCK DATABASE FOR ID CHECKING ---
 const MOCK_EXISTING_IDS = [
@@ -38,6 +42,9 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   const [notification, setNotification] = useState<SystemNotificationData | null>(null);
   const [theme, setTheme] = useState<'SYSTEM' | 'SHADOW' | 'RULER'>('SYSTEM');
   
+  // Visual state for level up animation
+  const [showLevelUp, setShowLevelUp] = useState(false);
+
   // Temporary storage for the newly registered user in this session
   const [sessionUser, setSessionUser] = useState<{name: string, email: string, id: string, pass: string} | null>(null);
 
@@ -118,7 +125,8 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
                 system_state: SystemState.NORMAL,
                 stats: INITIAL_STATS,
                 title: "The Awakened",
-                daily_streak: 1
+                daily_streak: 1,
+                job_class: 'None'
              };
              
              setUser(newUser);
@@ -220,20 +228,50 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
         
         // 5. Check level up
         if (totalXp >= currentLevelThreshold) {
-                setTimeout(() => {
-                    notify("LEVEL UP!", `You have reached Level ${user.level + 1}!`, "LEVEL_UP");
-                    
-                    setUser(prev => {
-                        if (!prev) return null;
-                        const overflowXp = prev.xp - (prev.level * 100);
-                        return {
-                            ...prev,
-                            level: prev.level + 1,
-                            xp: Math.max(0, overflowXp)
-                        };
-                    });
-                }, 2500);
+            // Trigger Visual Animation
+            setTimeout(() => {
+                setShowLevelUp(true);
+                // Hide animation after 3.5s
+                setTimeout(() => setShowLevelUp(false), 3500);
+            }, 1000);
+
+            // Update Logic
+            setTimeout(() => {
+                notify("LEVEL UP!", `You have reached Level ${user.level + 1}!`, "LEVEL_UP");
+                
+                setUser(prev => {
+                    if (!prev) return null;
+                    const overflowXp = prev.xp - (prev.level * 100);
+                    return {
+                        ...prev,
+                        level: prev.level + 1,
+                        xp: Math.max(0, overflowXp)
+                    };
+                });
+            }, 2500);
         }
+    }
+  };
+
+  const updateStat = (stat: keyof UserStats, value: number) => {
+    setUser(prev => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        stats: {
+          ...prev.stats,
+          [stat]: (prev.stats[stat] || 0) + value
+        }
+      };
+    });
+  };
+
+  // JOB PROMOTION LOGIC
+  const promoteJob = () => {
+    if (user && user.level >= 40) {
+      setUser(prev => prev ? { ...prev, job_class: 'Shadow Monarch', title: 'The One Who Arises' } : null);
+      setTheme('SHADOW');
+      notify("JOB CHANGE SUCCESSFUL", "CLASS: SHADOW MONARCH\nTHEME UNLOCKED: SHADOW", "SYSTEM_ALERT");
     }
   };
 
@@ -253,6 +291,13 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
       notify("SYSTEM OVERRIDE", "Simulating Fatigue status change...", "WARNING");
   };
 
+  // Helper to force level up for testing
+  const debugLevelUp = () => {
+      setShowLevelUp(true);
+      setTimeout(() => setShowLevelUp(false), 3500);
+      setUser(prev => prev ? { ...prev, level: prev.level + 1 } : null);
+  };
+
   useEffect(() => {
     if (user) {
         // AI Flavor text
@@ -265,11 +310,16 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   }, [user]);
 
   return (
-    <AuthContext.Provider value={{ user, quests, login, register, logout, completeQuest, updateQuestProgress, addQuest, notify, clearNotification }}>
+    <AuthContext.Provider value={{ user, quests, login, register, logout, completeQuest, updateQuestProgress, addQuest, notify, clearNotification, promoteJob, updateStat }}>
       <ParticleCursor />
       {children}
       <SystemNotification notification={notification} onClear={clearNotification} />
       
+      {/* LEVEL UP OVERLAY */}
+      <AnimatePresence>
+          {showLevelUp && user && <LevelUpOverlay level={user.level} />}
+      </AnimatePresence>
+
       {/* GLITCH OVERLAY INTEGRATION */}
       {user && (
           <GlitchOverlay 
@@ -291,7 +341,13 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
                 onClick={simulateFatigue}
                 className="bg-red-900/50 text-[10px] text-red-500 border border-red-500 px-2 py-1 font-mono uppercase"
               >
-                  [DEV] Sim Fatigue ({user.stats.fatigue_level})
+                  [DEV] Fatigue ({user.stats.fatigue_level})
+              </button>
+              <button 
+                onClick={debugLevelUp}
+                className="bg-green-900/50 text-[10px] text-green-500 border border-green-500 px-2 py-1 font-mono uppercase"
+              >
+                  [DEV] Lvl Up
               </button>
           </div>
       )}
@@ -544,14 +600,12 @@ const LandingPage: React.FC = () => {
 };
 
 const Dashboard: React.FC = () => {
-  const { user, quests, completeQuest, updateQuestProgress, logout, addQuest, notify } = useAuth();
+  const { user, quests, completeQuest, updateQuestProgress, logout, addQuest, notify, promoteJob, updateStat } = useAuth();
   const [selectedQuestId, setSelectedQuestId] = useState<string | null>(null);
   const [isBooting, setIsBooting] = useState(true);
   const [isGeneratingQuest, setIsGeneratingQuest] = useState(false);
   
   if (!user) return <Navigate to="/" />;
-
-  const xpProgress = (user.xp / (user.level * 100)) * 100;
 
   // Derive the active quest object from the global state using ID
   const selectedQuest = selectedQuestId ? quests.find(q => q.id === selectedQuestId) || null : null;
@@ -597,32 +651,88 @@ const Dashboard: React.FC = () => {
       </AnimatePresence>
 
       <div className="min-h-screen p-4 md:p-8 pt-24 relative z-10">
-        {/* Top HUD */}
+        
+        {/* --- TECH HUD TOP BAR --- */}
         <motion.div 
-          initial={{ y: -50, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: isBooting ? 0 : 0.5 }} // Wait for boot if happening
-          className="fixed top-0 left-0 right-0 h-20 bg-gradient-to-b from-black via-black/80 to-transparent flex items-center justify-between px-8 z-40 border-b border-neon-blue/20"
+          initial={{ y: -100 }}
+          animate={{ y: 0 }}
+          transition={{ delay: isBooting ? 0 : 0.5, type: "spring", stiffness: 50 }}
+          className="fixed top-0 left-0 right-0 z-50 pointer-events-none"
         >
-          <div className="flex items-center gap-4">
-            <div className="h-10 w-10 rounded border border-neon-blue flex items-center justify-center bg-neon-blue/10">
-              <span className="font-orbitron font-bold text-neon-blue">FN</span>
+            {/* Main Top Bar Container - Allows clicks on children */}
+            <div className="flex justify-between items-start">
+                
+                {/* LEFT WING */}
+                <div className="pointer-events-auto relative">
+                    {/* Shape Background */}
+                    <div className="absolute inset-0 bg-black/90 border-b-2 border-r-2 border-neon-blue/30" 
+                         style={{ clipPath: "polygon(0 0, 100% 0, 85% 100%, 0 100%)" }} />
+                    
+                    {/* Decorative Tech Lines */}
+                    <div className="absolute bottom-0 left-0 w-[80%] h-[2px] bg-neon-blue shadow-[0_0_10px_#00f3ff]" />
+
+                    {/* Content */}
+                    <div className="relative z-10 pl-6 pr-16 py-4 flex items-center gap-4">
+                        <div className="h-10 w-10 bg-neon-blue/20 border border-neon-blue flex items-center justify-center shadow-[0_0_15px_rgba(0,243,255,0.3)]">
+                            <span className="font-orbitron font-bold text-neon-blue">FN</span>
+                        </div>
+                        <div className="flex flex-col">
+                            <span className="font-orbitron font-bold text-white text-lg tracking-widest leading-none">FITNOVA</span>
+                            <span className="font-mono text-[9px] text-neon-blue/60 tracking-[0.3em] uppercase">Arise System v4.1</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* CENTER DECORATION (Only Desktop) */}
+                <div className="hidden lg:flex flex-col items-center flex-grow mx-4 pointer-events-none">
+                    {/* Top thin line */}
+                    <div className="w-full h-[1px] bg-gray-800 relative top-2">
+                         <div className="absolute left-1/2 -translate-x-1/2 -top-1 w-32 h-[3px] bg-neon-blue" />
+                    </div>
+                    {/* Trapezoid Status */}
+                    <div className="mt-2 px-8 py-1 bg-black/80 border border-neon-blue/30 backdrop-blur skew-x-[-20deg]">
+                         <div className="skew-x-[20deg] flex gap-4 text-[10px] font-mono text-gray-400">
+                             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"/> ONLINE</span>
+                             <span>|</span>
+                             <span>SERVER: KOREA-1</span>
+                             <span>|</span>
+                             <span>PING: 2ms</span>
+                         </div>
+                    </div>
+                </div>
+
+                {/* RIGHT WING */}
+                <div className="pointer-events-auto relative">
+                     {/* Shape Background */}
+                    <div className="absolute inset-0 bg-black/90 border-b-2 border-l-2 border-neon-blue/30" 
+                         style={{ clipPath: "polygon(15% 0, 100% 0, 100% 100%, 0 100%)" }} />
+                    
+                     {/* Decorative Tech Lines */}
+                     <div className="absolute bottom-0 right-0 w-[80%] h-[2px] bg-neon-blue shadow-[0_0_10px_#00f3ff]" />
+
+                     {/* Content */}
+                     <div className="relative z-10 pl-16 pr-6 py-4 flex items-center gap-6">
+                         <div className="text-right">
+                             <div className="font-mono text-[9px] text-gray-400 uppercase tracking-wider">HUNTER // {user.rank}</div>
+                             <div className="font-orbitron font-bold text-white tracking-widest">{user.name}</div>
+                         </div>
+                         
+                         <button 
+                            onClick={logout}
+                            className="group relative h-10 w-10 flex items-center justify-center border border-red-500/30 hover:bg-red-900/20 hover:border-red-500 transition-all"
+                         >
+                             {/* Power Icon SVG */}
+                             <svg className="w-5 h-5 text-red-500 group-hover:drop-shadow-[0_0_8px_rgba(220,38,38,0.8)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                             </svg>
+                             {/* Corner Ticks */}
+                             <div className="absolute top-0 right-0 w-1 h-1 bg-red-500" />
+                             <div className="absolute bottom-0 left-0 w-1 h-1 bg-red-500" />
+                         </button>
+                     </div>
+                </div>
+
             </div>
-            <div>
-                <div className="text-neon-blue font-orbitron font-bold tracking-wider">FITNOVA SYSTEM</div>
-                <div className="text-[10px] text-neon-purple font-mono uppercase tracking-[0.2em]">Ver 4.0 // Online</div>
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-8">
-            <div className="text-right">
-                <div className="text-xs text-gray-500 font-mono uppercase">Player Name</div>
-                <div className="text-white font-orbitron font-bold tracking-widest">{user.name}</div>
-            </div>
-            <button onClick={logout} className="text-red-500 font-mono text-xs border border-red-500/50 px-2 py-1 hover:bg-red-500/10 transition-colors">
-                LOGOUT
-            </button>
-          </div>
         </motion.div>
 
         <div className="max-w-[1600px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -630,32 +740,8 @@ const Dashboard: React.FC = () => {
           {/* --- LEFT COLUMN: STATS SUMMARY (Width: 3/12) --- */}
           <div className="lg:col-span-3 space-y-4">
               
-              {/* ID Card */}
-              <div className="border border-neon-blue/50 bg-black/60 backdrop-blur p-6 relative overflow-hidden group hover:border-neon-blue transition-colors">
-                <div className="absolute top-0 right-0 p-2 text-neon-purple font-mono text-xs border-l border-b border-neon-purple/30">
-                    {user.rank}
-                </div>
-                
-                <div className="text-center mb-6">
-                    <div className="text-gray-400 font-mono text-xs uppercase mb-1">Level</div>
-                    <div className="text-6xl font-orbitron text-white font-bold drop-shadow-[0_0_10px_rgba(255,255,255,0.5)]">
-                      {user.level}
-                    </div>
-                    <div className="text-neon-purple font-mono text-xs mt-2">{user.title}</div>
-                </div>
-
-                <div className="mb-2 flex justify-between text-xs text-neon-blue font-mono">
-                    <span>EXP</span>
-                    <span>{xpProgress.toFixed(1)}%</span>
-                </div>
-                <div className="h-1 bg-gray-800 w-full overflow-hidden">
-                    <motion.div 
-                      initial={{ width: 0 }}
-                      animate={{ width: `${xpProgress}%` }}
-                      className="h-full bg-neon-blue shadow-[0_0_10px_#00f3ff]"
-                    />
-                </div>
-              </div>
+              {/* NEW ID CARD */}
+              <HunterIDCard user={user} />
 
               {/* Streak Flame */}
               <StreakFlame streak={user.daily_streak} />
@@ -686,7 +772,7 @@ const Dashboard: React.FC = () => {
           {/* --- MIDDLE COLUMN: HERO AVATAR (Width: 4/12) --- */}
           <div className="lg:col-span-5 flex flex-col gap-6">
               <div className="flex-grow min-h-[500px] relative">
-                  <PlayerAvatar />
+                  <PlayerAvatar stats={user.stats} onStatUpdate={updateStat} />
               </div>
               {/* Detailed Stats below avatar for central focus */}
               <StatsGrid stats={user.stats} baselineStats={INITIAL_STATS} currentRank={user.rank} />
@@ -697,6 +783,15 @@ const Dashboard: React.FC = () => {
               
               {/* ACTIVE QUESTS (Top half) */}
               <div className="flex flex-col h-[50%] min-h-[300px]">
+                
+                {/* NEW: JOB CHANGE WIDGET */}
+                <JobChangeWidget 
+                    currentLevel={user.level} 
+                    targetLevel={40} 
+                    jobClass={user.job_class || 'None'}
+                    onPromote={promoteJob}
+                />
+
                 <div className="mb-4 border-b border-gray-800 pb-2 flex items-center justify-between">
                    <h2 className="text-xl font-orbitron text-white flex items-center gap-4">
                       <span className="w-2 h-6 bg-neon-blue"></span>

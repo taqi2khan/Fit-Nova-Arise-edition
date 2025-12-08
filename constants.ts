@@ -34,7 +34,8 @@ export const MOCK_USER: User = {
   system_state: SystemState.NORMAL,
   stats: INITIAL_STATS,
   title: "The Reawakened Player",
-  daily_streak: 12
+  daily_streak: 12,
+  job_class: 'None'
 };
 
 export const MOCK_QUESTS: Quest[] = [

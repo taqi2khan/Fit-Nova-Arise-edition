@@ -57,6 +57,7 @@ export interface User {
   stats: UserStats;
   title: string; // e.g., "Wolf Slayer"
   daily_streak: number; // New field for streak tracking
+  job_class: string; // New field for Job Change
 }
 
 export interface Quest {
@@ -90,4 +91,6 @@ export interface AuthContextType {
   addQuest: (quest: Quest) => void;
   notify: (title: string, message: string, type?: SystemNotificationData['type']) => void;
   clearNotification: () => void;
+  promoteJob: () => void; // New method
+  updateStat: (stat: keyof UserStats, value: number) => void; // New method for manual/animated updates
 }
