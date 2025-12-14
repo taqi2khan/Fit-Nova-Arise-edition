@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { User, Quest } from "../types";
 
@@ -110,6 +111,67 @@ export const generateQuest = async (user: User): Promise<Partial<Quest> | null> 
 
   } catch (error) {
     console.error("Quest generation failed", error);
+    return null;
+  }
+};
+
+export const generateHunterProfileImage = async (user: User, customDetails?: string): Promise<string | null> => {
+  const ai = initGenAI();
+  if (!ai) return null;
+
+  try {
+    const isHighRank = user.rank.includes('S') || user.rank.includes('National');
+    const isMidRank = user.rank.includes('A') || user.rank.includes('B');
+    
+    let baseAppearance = "";
+    if (isHighRank) {
+        baseAppearance = "Legendary hunter, glowing magical aura, confident and menacing expression, intricate glowing futuristic armor, god-tier power radiating, glowing eyes.";
+    } else if (isMidRank) {
+        baseAppearance = "Experienced hunter, solid combat gear, focused expression, holding a weapon, subtle magical aura.";
+    } else {
+        baseAppearance = "Novice hunter, wearing a simple track suit or basic light armor, determined but rookie appearance, sweating slightly.";
+    }
+
+    // Combine base rank appearance with user custom details
+    const appearancePrompt = customDetails 
+        ? `User Specifications: "${customDetails}". Base archetype: ${baseAppearance}`
+        : baseAppearance;
+
+    const prompt = `
+      Generate a high-quality anime style portrait for an ID Card.
+      Character Name: ${user.name}.
+      Role: ${user.job_class}.
+      Appearance Description: ${appearancePrompt}
+      Art Style: Solo Leveling manhwa style, high contrast, cool lighting, digital art, sharp lines. 
+      Background: Abstract dark digital pattern.
+      Format: Passport photo style, head and shoulders.
+    `;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash-image',
+      contents: {
+        parts: [{ text: prompt }]
+      },
+      config: {
+          imageConfig: {
+              aspectRatio: "3:4"
+          }
+      }
+    });
+
+    // Extract image from response parts
+    if (response.candidates?.[0]?.content?.parts) {
+        for (const part of response.candidates[0].content.parts) {
+            if (part.inlineData && part.inlineData.data) {
+                return `data:${part.inlineData.mimeType || 'image/png'};base64,${part.inlineData.data}`;
+            }
+        }
+    }
+    
+    return null;
+
+  } catch (error) {
+    console.error("Image generation failed", error);
     return null;
   }
 };

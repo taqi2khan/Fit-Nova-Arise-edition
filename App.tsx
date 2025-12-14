@@ -12,7 +12,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { generateSystemMessage, generateQuest } from './services/geminiService';
 import { StatRadar } from './components/StatRadar';
 import { SystemLog } from './components/SystemLog';
-import { PlayerAvatar } from './components/PlayerAvatar';
 import { GlitchOverlay } from './components/GlitchOverlay';
 import { ParticleCursor } from './components/ParticleCursor';
 import { SystemBoot } from './components/SystemBoot';
@@ -25,6 +24,7 @@ import { WorkoutHeatmap } from './components/WorkoutHeatmap';
 import { JobChangeWidget } from './components/JobChangeWidget';
 import { HunterIDCard } from './components/HunterIDCard';
 import { LevelUpOverlay } from './components/LevelUpOverlay';
+import { Sidebar } from './components/Sidebar';
 
 // --- MOCK DATABASE FOR ID CHECKING ---
 const MOCK_EXISTING_IDS = [
@@ -33,6 +33,13 @@ const MOCK_EXISTING_IDS = [
   'TEST#12', 
   'JINWOO#99'
 ];
+
+interface RegisteredUser {
+  name: string;
+  email: string;
+  id: string;
+  pass: string;
+}
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -45,8 +52,11 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   // Visual state for level up animation
   const [showLevelUp, setShowLevelUp] = useState(false);
 
-  // Temporary storage for the newly registered user in this session
-  const [sessionUser, setSessionUser] = useState<{name: string, email: string, id: string, pass: string} | null>(null);
+  // Persistent storage for registered users
+  const [registeredUsers, setRegisteredUsers] = useState<RegisteredUser[]>(() => {
+    const saved = localStorage.getItem('fitnova_users');
+    return saved ? JSON.parse(saved) : [];
+  });
 
   // Apply Theme Class to Body
   useEffect(() => {
@@ -69,7 +79,10 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   const clearNotification = () => setNotification(null);
 
   const register = (name: string, email: string, id: string, pass: string) => {
-    setSessionUser({ name, email, id, pass });
+    const newUser = { name, email, id, pass };
+    const updatedUsers = [...registeredUsers, newUser];
+    setRegisteredUsers(updatedUsers);
+    localStorage.setItem('fitnova_users', JSON.stringify(updatedUsers));
   };
 
   const login = (identifier?: string, password?: string): Promise<boolean> => {
@@ -103,22 +116,19 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
           return;
         }
 
-        // --- 2. CHECK SESSION REGISTERED USER ---
-        if (sessionUser) {
-           const sessionEmail = (sessionUser.email || '').toLowerCase();
-           const sessionId = sessionUser.id.toLowerCase();
+        // --- 2. CHECK REGISTERED USERS (FROM LOCAL STORAGE) ---
+        const foundUser = registeredUsers.find(u => {
+            const uId = u.id.toLowerCase();
+            const uEmail = (u.email || '').toLowerCase();
+            return (uId === lowerIdentifier || (uEmail && uEmail === lowerIdentifier));
+        });
 
-           // Check email if it exists (Case-insensitive)
-           const isEmailMatch = sessionEmail && lowerIdentifier === sessionEmail;
-           // Check ID (Case-insensitive to be user friendly)
-           const isIdMatch = lowerIdentifier === sessionId;
-
-           if ((isEmailMatch || isIdMatch) && password === sessionUser.pass) {
+        if (foundUser && foundUser.pass === password) {
              // Initialize a FRESH user (Level 1)
              const newUser: User = {
-                id: sessionUser.id, // Use stored ID with correct casing
-                name: sessionUser.name,
-                email: sessionUser.email,
+                id: foundUser.id,
+                name: foundUser.name,
+                email: foundUser.email,
                 xp: 0,
                 level: 1,
                 rank: Rank.E,
@@ -130,10 +140,9 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
              };
              
              setUser(newUser);
-             notify("SYSTEM INITIALIZATION", `Welcome, Hunter ${sessionUser.name}.\nStarting Stats Assigned.`, "INFO");
+             notify("SYSTEM INITIALIZATION", `Welcome, Hunter ${foundUser.name}.\nStarting Stats Assigned.`, "INFO");
              resolve(true);
              return;
-           }
         }
 
         // --- 3. FAILURE ---
@@ -298,6 +307,23 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
       setUser(prev => prev ? { ...prev, level: prev.level + 1 } : null);
   };
 
+  // Helper to cycle ranks for testing
+  const debugToggleRank = () => {
+    setUser(prev => {
+        if (!prev) return null;
+        let nextRank = Rank.E;
+        // Cycle: E -> B -> A -> S -> National
+        if (prev.rank === Rank.E) nextRank = Rank.B;
+        else if (prev.rank === Rank.B) nextRank = Rank.A;
+        else if (prev.rank === Rank.A) nextRank = Rank.S;
+        else if (prev.rank === Rank.S) nextRank = Rank.NATIONAL;
+        else nextRank = Rank.E;
+
+        return { ...prev, rank: nextRank };
+    });
+    notify("SYSTEM OVERRIDE", "Hunter Rank Modified.", "SYSTEM_ALERT");
+  };
+
   useEffect(() => {
     if (user) {
         // AI Flavor text
@@ -310,7 +336,7 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   }, [user]);
 
   return (
-    <AuthContext.Provider value={{ user, quests, login, register, logout, completeQuest, updateQuestProgress, addQuest, notify, clearNotification, promoteJob, updateStat }}>
+    <AuthContext.Provider value={{ user, quests, login, register, logout, completeQuest, updateQuestProgress, addQuest, notify, clearNotification, promoteJob, updateStat, theme, toggleTheme }}>
       <ParticleCursor />
       {children}
       <SystemNotification notification={notification} onClear={clearNotification} />
@@ -341,13 +367,19 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
                 onClick={simulateFatigue}
                 className="bg-red-900/50 text-[10px] text-red-500 border border-red-500 px-2 py-1 font-mono uppercase"
               >
-                  [DEV] Fatigue ({user.stats.fatigue_level})
+                  [DEV] Fatigue
               </button>
               <button 
                 onClick={debugLevelUp}
                 className="bg-green-900/50 text-[10px] text-green-500 border border-green-500 px-2 py-1 font-mono uppercase"
               >
                   [DEV] Lvl Up
+              </button>
+              <button 
+                onClick={debugToggleRank}
+                className="bg-purple-900/50 text-[10px] text-purple-400 border border-purple-500 px-2 py-1 font-mono uppercase"
+              >
+                  [DEV] Rank: {user.rank.split('-')[0]}
               </button>
           </div>
       )}
@@ -599,29 +631,44 @@ const LandingPage: React.FC = () => {
   );
 };
 
+// --- REUSABLE GLASS CARD COMPONENT ---
+const GlassCard: React.FC<{ children: React.ReactNode; className?: string; title?: string; subtitle?: string }> = ({ children, className = "", title, subtitle }) => (
+    <div className={`bg-[#0a0a0a]/60 backdrop-blur-xl border border-white/5 rounded-3xl p-6 relative overflow-hidden group ${className}`}>
+        {/* Subtle Gradient Glow from Top */}
+        <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-white/10 to-transparent opacity-50" />
+        
+        {title && (
+            <div className="mb-6 flex justify-between items-baseline">
+                <div>
+                    <h3 className="text-white font-orbitron font-bold text-lg tracking-wide">{title}</h3>
+                    {subtitle && <p className="text-gray-500 font-mono text-xs mt-1">{subtitle}</p>}
+                </div>
+            </div>
+        )}
+        {children}
+    </div>
+);
+
 const Dashboard: React.FC = () => {
-  const { user, quests, completeQuest, updateQuestProgress, logout, addQuest, notify, promoteJob, updateStat } = useAuth();
+  const { user, quests, completeQuest, updateQuestProgress, logout, addQuest, notify, promoteJob, updateStat, theme, toggleTheme } = useAuth();
   const [selectedQuestId, setSelectedQuestId] = useState<string | null>(null);
   const [isBooting, setIsBooting] = useState(true);
   const [isGeneratingQuest, setIsGeneratingQuest] = useState(false);
+  const [activeTab, setActiveTab] = useState('dashboard');
   
   if (!user) return <Navigate to="/" />;
 
-  // Derive the active quest object from the global state using ID
   const selectedQuest = selectedQuestId ? quests.find(q => q.id === selectedQuestId) || null : null;
-
-  // Check for incomplete DAILY quests for the Penalty Timer
-  const hasIncompleteDaily = quests.some(q => q.type === 'DAILY' && !q.completed);
+  const activeQuests = quests.filter(q => !q.completed);
+  const xpPercentage = (user.xp / (user.level * 100)) * 100;
 
   const handleQuestGeneration = async () => {
     if (isGeneratingQuest) return;
     setIsGeneratingQuest(true);
-    notify("SYSTEM SCAN", "Analyzing player biometrics for new scenario...", "INFO");
+    notify("SYSTEM SCAN", "Analyzing player biometrics...", "INFO");
 
     const partialQuest = await generateQuest(user);
-    
     if (partialQuest) {
-      // Map partial to full quest
       const newQuest: Quest = {
         id: `AI_QUEST_${Date.now()}`,
         title: partialQuest.title || "UNKNOWN QUEST",
@@ -634,14 +681,252 @@ const Dashboard: React.FC = () => {
         type: partialQuest.type || 'SUDDEN',
         penalty: partialQuest.penalty
       };
-
       addQuest(newQuest);
       notify("NEW QUEST RECEIVED", `Scenario: ${newQuest.title}`, "SYSTEM_ALERT");
     } else {
       notify("SCAN FAILED", "Unable to generate quest scenario.", "WARNING");
     }
-    
     setIsGeneratingQuest(false);
+  };
+
+  const renderContent = () => {
+    switch (activeTab) {
+        case 'dashboard':
+            return (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6 auto-rows-[minmax(180px,auto)]">
+                    {/* 1. HUNTER STATUS (Big Left Card) */}
+                    <GlassCard className="col-span-1 lg:col-span-8 row-span-2 flex flex-col md:flex-row gap-8">
+                         <div className="flex-1 flex flex-col">
+                            <div className="flex justify-between items-start mb-6">
+                                <div>
+                                    <h2 className="text-2xl font-orbitron font-bold text-white">Hunter Status</h2>
+                                    <p className="text-neon-blue font-mono text-xs tracking-wider">Rank: {user.rank}</p>
+                                </div>
+                                 <div className="text-right">
+                                    <div className="text-3xl font-bold font-mono text-white">{user.stats.power_index}</div>
+                                    <div className="text-[10px] text-gray-500 uppercase tracking-widest">Power Index</div>
+                                 </div>
+                            </div>
+                            
+                            {/* Central Stats Visuals (No Avatar) */}
+                            <div className="flex-grow flex items-center justify-center relative min-h-[300px]">
+                                 <div className="scale-125">
+                                    <StatRadar stats={user.stats} />
+                                 </div>
+                            </div>
+                         </div>
+    
+                         {/* Stats Sidebar inside card */}
+                         <div className="w-full md:w-64 border-l border-white/5 pl-0 md:pl-8 flex flex-col justify-center">
+                             <h3 className="text-sm font-orbitron font-bold text-gray-400 mb-4 uppercase">Core Metrics</h3>
+                             <StatsGrid stats={user.stats} compact={true} />
+                         </div>
+                    </GlassCard>
+    
+                    {/* 2. SYSTEM LEVEL (Progress Card) */}
+                    <GlassCard className="col-span-1 lg:col-span-4 lg:row-span-2 flex flex-col items-center justify-center text-center">
+                        <h3 className="text-gray-400 font-orbitron font-bold text-sm uppercase tracking-widest mb-6">System Level</h3>
+                        
+                        <div className="relative w-48 h-48 flex items-center justify-center mb-6">
+                            <svg className="w-full h-full transform -rotate-90">
+                                <circle cx="96" cy="96" r="88" stroke="rgba(255,255,255,0.05)" strokeWidth="12" fill="none" />
+                                <motion.circle 
+                                    cx="96" cy="96" r="88" 
+                                    stroke="#bc13fe" 
+                                    strokeWidth="12" 
+                                    fill="none" 
+                                    strokeDasharray={552} 
+                                    strokeDashoffset={552 - (552 * xpPercentage) / 100}
+                                    strokeLinecap="round"
+                                    initial={{ strokeDashoffset: 552 }}
+                                    animate={{ strokeDashoffset: 552 - (552 * xpPercentage) / 100 }}
+                                    transition={{ duration: 1.5, ease: "easeOut" }}
+                                />
+                            </svg>
+                            <div className="absolute inset-0 flex flex-col items-center justify-center">
+                                <span className="text-5xl font-bold font-mono text-white">{user.level}</span>
+                                <span className="text-[10px] text-gray-500 uppercase tracking-widest mt-1">Current Level</span>
+                            </div>
+                        </div>
+    
+                        <div className="text-xs text-gray-400 font-mono">
+                            <span className="text-white">{Math.floor(user.xp)}</span> / {user.level * 100} XP
+                        </div>
+                    </GlassCard>
+    
+                    {/* 3. ACTIVE QUEST WIDGET (Replaces Map) */}
+                    <GlassCard className="col-span-1 lg:col-span-4 flex flex-col" title="Active Scenario">
+                        {activeQuests.length > 0 ? (
+                            <div className="flex-grow flex flex-col gap-4">
+                                 {/* Quest Visual */}
+                                 <div className="flex-1 bg-gradient-to-br from-indigo-900/40 to-black rounded-xl border border-white/5 p-4 relative overflow-hidden group cursor-pointer" onClick={() => setSelectedQuestId(activeQuests[0].id)}>
+                                     {/* Map-like patterns */}
+                                     <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(circle, #4f46e5 1px, transparent 1px)', backgroundSize: '16px 16px' }}></div>
+                                     
+                                     <div className="relative z-10">
+                                         <div className="flex justify-between items-start mb-2">
+                                             <span className="bg-neon-blue/20 text-neon-blue text-[10px] font-bold px-2 py-1 rounded">{activeQuests[0].difficulty}-RANK</span>
+                                             <span className="text-[10px] text-gray-400 font-mono">1.2km away</span>
+                                         </div>
+                                         <h4 className="text-white font-bold font-orbitron">{activeQuests[0].title}</h4>
+                                         <p className="text-gray-400 text-xs mt-1 truncate">{activeQuests[0].description}</p>
+                                         
+                                         {/* Objective Preview */}
+                                         <div className="mt-4 space-y-2">
+                                             {activeQuests[0].objectives.slice(0, 2).map((obj, i) => (
+                                                 <div key={i} className="flex items-center gap-2 text-[10px] font-mono text-gray-300">
+                                                     <div className={`w-2 h-2 rounded-full ${obj.current >= obj.total ? 'bg-green-500' : 'bg-gray-600'}`} />
+                                                     {obj.text} ({obj.current}/{obj.total})
+                                                 </div>
+                                             ))}
+                                         </div>
+                                     </div>
+                                 </div>
+                                 
+                                 {/* Job Change Progress (Mini) */}
+                                 <div className="h-10">
+                                     <JobChangeWidget currentLevel={user.level} targetLevel={40} jobClass={user.job_class} onPromote={promoteJob} />
+                                 </div>
+                            </div>
+                        ) : (
+                            <div className="flex-grow flex items-center justify-center text-gray-500 font-mono text-xs">
+                                NO ACTIVE QUESTS
+                            </div>
+                        )}
+                    </GlassCard>
+    
+                    {/* 4. ACTIVITY & LOGS */}
+                    <GlassCard className="col-span-1 lg:col-span-5 flex flex-col" title="System Logs">
+                        <div className="flex-grow h-32 relative overflow-hidden rounded-xl bg-black/40 border border-white/5">
+                            <SystemLog />
+                        </div>
+                    </GlassCard>
+                    
+                    {/* 5. SKILL RUNES (Widget) */}
+                    <GlassCard className="col-span-1 lg:col-span-3 flex flex-col" title="Skill Runes">
+                       <div className="flex-grow overflow-y-auto custom-scrollbar h-32">
+                           <SkillLibrary mode="WIDGET" />
+                       </div>
+                    </GlassCard>
+                </div>
+            );
+        case 'quests':
+            return (
+                <div className="space-y-6 animate-fade-in">
+                    <div className="flex justify-between items-center mb-6">
+                        <h2 className="text-3xl font-orbitron font-bold text-white">Quest Log</h2>
+                        <button onClick={handleQuestGeneration} disabled={isGeneratingQuest} className="bg-neon-blue/20 border border-neon-blue text-neon-blue px-4 py-2 font-mono text-xs uppercase hover:bg-neon-blue hover:text-black transition-colors">
+                            {isGeneratingQuest ? 'Scanning...' : 'Scan for New Scenarios'}
+                        </button>
+                    </div>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        {quests.map(quest => (
+                            <div key={quest.id} onClick={() => setSelectedQuestId(quest.id)} className={`cursor-pointer group relative p-6 border rounded-xl overflow-hidden transition-all ${quest.completed ? 'border-green-500/30 bg-green-900/10' : 'border-white/10 bg-black/40 hover:border-neon-blue/50'}`}>
+                                <div className="flex justify-between items-start mb-4">
+                                    <h3 className={`font-orbitron font-bold text-lg ${quest.completed ? 'text-green-400' : 'text-white'}`}>{quest.title}</h3>
+                                    <span className={`text-xs font-mono px-2 py-1 border ${quest.completed ? 'border-green-500 text-green-500' : 'border-neon-blue text-neon-blue'}`}>{quest.difficulty}-RANK</span>
+                                </div>
+                                <p className="text-gray-400 text-sm mb-4 font-mono">{quest.description}</p>
+                                <div className="space-y-2">
+                                     {quest.objectives.map((obj, i) => (
+                                         <div key={i} className="flex items-center gap-2 text-xs font-mono text-gray-500">
+                                             <div className={`w-1.5 h-1.5 rounded-full ${obj.current >= obj.total ? 'bg-green-500' : 'bg-gray-700'}`} />
+                                             {obj.text} ({obj.current}/{obj.total})
+                                         </div>
+                                     ))}
+                                </div>
+                                {quest.completed && <div className="absolute top-4 right-16 text-green-500/20 font-black text-6xl -rotate-12 pointer-events-none">CLEARED</div>}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        case 'stats':
+            return (
+                <div className="animate-fade-in space-y-6">
+                    <h2 className="text-3xl font-orbitron font-bold text-white mb-6">Detailed Analytics</h2>
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <div className="lg:col-span-1 space-y-6">
+                            <GlassCard title="Core Attributes">
+                                <StatsGrid stats={user.stats} />
+                            </GlassCard>
+                            <PenaltyTimer />
+                        </div>
+                        <div className="lg:col-span-2 space-y-6">
+                            <GlassCard title="Performance History">
+                                <WorkoutHeatmap />
+                            </GlassCard>
+                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <SleepVisualizer sleepQuality={user.stats.sleep_quality} />
+                                <StreakFlame streak={user.daily_streak} />
+                            </div>
+                            <div className="mt-6">
+                                <ShadowExtraction completedQuests={quests.filter(q => q.completed).length} />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        case 'skills':
+            return (
+                <div className="animate-fade-in h-[calc(100vh-200px)] flex flex-col">
+                    <div className="flex justify-between items-end mb-6 border-b border-gray-800 pb-4">
+                        <div>
+                            <h2 className="text-3xl font-orbitron font-bold text-white">Skill Library</h2>
+                            <p className="text-neon-blue font-mono text-xs mt-2">ACCESSING RUNESTONE DATABASE...</p>
+                        </div>
+                        <div className="text-right text-gray-500 font-mono text-xs">
+                            TOTAL SKILLS: 21<br/>
+                            UNLOCKED: 16
+                        </div>
+                    </div>
+                    <div className="flex-grow overflow-y-auto pr-2 custom-scrollbar">
+                         <SkillLibrary mode="FULL" />
+                    </div>
+                </div>
+            );
+        case 'settings':
+            return (
+                <div className="animate-fade-in max-w-2xl mx-auto">
+                     <h2 className="text-3xl font-orbitron font-bold text-white mb-8 border-b border-gray-800 pb-4">System Config</h2>
+                     
+                     <div className="space-y-6">
+                         <div className="flex items-center justify-between p-4 bg-white/5 border border-white/10 rounded-lg">
+                             <div>
+                                 <div className="text-white font-bold font-orbitron">SYSTEM THEME</div>
+                                 <div className="text-xs text-gray-500 font-mono">OVERRIDE INTERFACE COLORS</div>
+                             </div>
+                             <button onClick={toggleTheme} className="px-4 py-2 border border-neon-blue text-neon-blue font-mono text-xs hover:bg-neon-blue hover:text-black transition-colors">
+                                 CURRENT: {theme}
+                             </button>
+                         </div>
+                         
+                         <div className="flex items-center justify-between p-4 bg-white/5 border border-white/10 rounded-lg">
+                             <div>
+                                 <div className="text-white font-bold font-orbitron">NOTIFICATIONS</div>
+                                 <div className="text-xs text-gray-500 font-mono">HUD ALERTS & POPUPS</div>
+                             </div>
+                             <div className="flex gap-2">
+                                 <button className="px-3 py-1 bg-neon-blue text-black font-bold text-xs">ON</button>
+                                 <button className="px-3 py-1 bg-black border border-gray-700 text-gray-500 font-bold text-xs">OFF</button>
+                             </div>
+                         </div>
+
+                         <div className="flex items-center justify-between p-4 bg-red-900/10 border border-red-900/30 rounded-lg mt-12">
+                             <div>
+                                 <div className="text-red-500 font-bold font-orbitron">DANGER ZONE</div>
+                                 <div className="text-xs text-red-400 font-mono">DISCONNECT FROM SYSTEM</div>
+                             </div>
+                             <button onClick={logout} className="px-6 py-2 border border-red-500 text-red-500 font-orbitron font-bold text-xs hover:bg-red-500 hover:text-white transition-colors">
+                                 LOGOUT
+                             </button>
+                         </div>
+                     </div>
+                </div>
+            );
+        default:
+            return null;
+    }
   };
 
   return (
@@ -650,215 +935,37 @@ const Dashboard: React.FC = () => {
         {isBooting && <SystemBoot onComplete={() => setIsBooting(false)} />}
       </AnimatePresence>
 
-      <div className="min-h-screen p-4 md:p-8 pt-24 relative z-10">
+      <div className="min-h-screen bg-transparent relative z-10 flex text-gray-200">
         
-        {/* --- TECH HUD TOP BAR --- */}
-        <motion.div 
-          initial={{ y: -100 }}
-          animate={{ y: 0 }}
-          transition={{ delay: isBooting ? 0 : 0.5, type: "spring", stiffness: 50 }}
-          className="fixed top-0 left-0 right-0 z-50 pointer-events-none"
-        >
-            {/* Main Top Bar Container - Allows clicks on children */}
-            <div className="flex justify-between items-start">
-                
-                {/* LEFT WING */}
-                <div className="pointer-events-auto relative">
-                    {/* Shape Background */}
-                    <div className="absolute inset-0 bg-black/90 border-b-2 border-r-2 border-neon-blue/30" 
-                         style={{ clipPath: "polygon(0 0, 100% 0, 85% 100%, 0 100%)" }} />
-                    
-                    {/* Decorative Tech Lines */}
-                    <div className="absolute bottom-0 left-0 w-[80%] h-[2px] bg-neon-blue shadow-[0_0_10px_#00f3ff]" />
+        {/* --- LEFT SIDEBAR NAVIGATION --- */}
+        <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
 
-                    {/* Content */}
-                    <div className="relative z-10 pl-6 pr-16 py-4 flex items-center gap-4">
-                        <div className="h-10 w-10 bg-neon-blue/20 border border-neon-blue flex items-center justify-center shadow-[0_0_15px_rgba(0,243,255,0.3)]">
-                            <span className="font-orbitron font-bold text-neon-blue">FN</span>
-                        </div>
-                        <div className="flex flex-col">
-                            <span className="font-orbitron font-bold text-white text-lg tracking-widest leading-none">FITNOVA</span>
-                            <span className="font-mono text-[9px] text-neon-blue/60 tracking-[0.3em] uppercase">Arise System v4.1</span>
-                        </div>
-                    </div>
+        {/* --- MAIN CONTENT AREA --- */}
+        <div className="flex-1 ml-20 md:ml-24 p-6 md:p-10 max-w-[1920px]">
+            
+            {/* HEADER AREA: TOP BAR + ID CARD */}
+            <header className="flex flex-col lg:flex-row items-center justify-between gap-6 mb-8">
+                <div className="w-full lg:w-1/2">
+                    <p className="text-gray-400 font-mono text-xs uppercase tracking-widest mb-1">System Interface v4.2</p>
+                    <h1 className="text-3xl md:text-4xl font-orbitron font-bold text-white mb-4">
+                        Welcome Back, <span className="text-transparent bg-clip-text bg-gradient-to-r from-neon-blue to-neon-purple">{user.name}</span>
+                    </h1>
                 </div>
 
-                {/* CENTER DECORATION (Only Desktop) */}
-                <div className="hidden lg:flex flex-col items-center flex-grow mx-4 pointer-events-none">
-                    {/* Top thin line */}
-                    <div className="w-full h-[1px] bg-gray-800 relative top-2">
-                         <div className="absolute left-1/2 -translate-x-1/2 -top-1 w-32 h-[3px] bg-neon-blue" />
-                    </div>
-                    {/* Trapezoid Status */}
-                    <div className="mt-2 px-8 py-1 bg-black/80 border border-neon-blue/30 backdrop-blur skew-x-[-20deg]">
-                         <div className="skew-x-[20deg] flex gap-4 text-[10px] font-mono text-gray-400">
-                             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"/> ONLINE</span>
-                             <span>|</span>
-                             <span>SERVER: KOREA-1</span>
-                             <span>|</span>
-                             <span>PING: 2ms</span>
-                         </div>
-                    </div>
+                {/* HUNTER ID CARD (Always Visible) */}
+                <div className="w-full lg:w-1/2 flex justify-center lg:justify-end">
+                     <HunterIDCard user={user} />
                 </div>
+            </header>
 
-                {/* RIGHT WING */}
-                <div className="pointer-events-auto relative">
-                     {/* Shape Background */}
-                    <div className="absolute inset-0 bg-black/90 border-b-2 border-l-2 border-neon-blue/30" 
-                         style={{ clipPath: "polygon(15% 0, 100% 0, 100% 100%, 0 100%)" }} />
-                    
-                     {/* Decorative Tech Lines */}
-                     <div className="absolute bottom-0 right-0 w-[80%] h-[2px] bg-neon-blue shadow-[0_0_10px_#00f3ff]" />
-
-                     {/* Content */}
-                     <div className="relative z-10 pl-16 pr-6 py-4 flex items-center gap-6">
-                         <div className="text-right">
-                             <div className="font-mono text-[9px] text-gray-400 uppercase tracking-wider">HUNTER // {user.rank}</div>
-                             <div className="font-orbitron font-bold text-white tracking-widest">{user.name}</div>
-                         </div>
-                         
-                         <button 
-                            onClick={logout}
-                            className="group relative h-10 w-10 flex items-center justify-center border border-red-500/30 hover:bg-red-900/20 hover:border-red-500 transition-all"
-                         >
-                             {/* Power Icon SVG */}
-                             <svg className="w-5 h-5 text-red-500 group-hover:drop-shadow-[0_0_8px_rgba(220,38,38,0.8)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                             </svg>
-                             {/* Corner Ticks */}
-                             <div className="absolute top-0 right-0 w-1 h-1 bg-red-500" />
-                             <div className="absolute bottom-0 left-0 w-1 h-1 bg-red-500" />
-                         </button>
-                     </div>
-                </div>
-
+            {/* DYNAMIC CONTENT AREA */}
+            <div className="min-h-[600px]">
+                {renderContent()}
             </div>
-        </motion.div>
-
-        <div className="max-w-[1600px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6">
-          
-          {/* --- LEFT COLUMN: STATS SUMMARY (Width: 3/12) --- */}
-          <div className="lg:col-span-3 space-y-4">
-              
-              {/* NEW ID CARD */}
-              <HunterIDCard user={user} />
-
-              {/* Streak Flame */}
-              <StreakFlame streak={user.daily_streak} />
-
-              {/* Penalty Timer (Conditional) */}
-              {hasIncompleteDaily && <PenaltyTimer />}
-
-              {/* Radar & Log Stacked */}
-              <div className="border border-gray-800 bg-black/40">
-                  <StatRadar stats={user.stats} />
-              </div>
-              
-              {/* Heatmap */}
-              <WorkoutHeatmap />
-              
-              <div className="h-40 border border-gray-800">
-                  <SystemLog />
-              </div>
-              
-              {/* Sleep Visualizer */}
-              <SleepVisualizer sleepQuality={user.stats.sleep_quality} />
-
-              {/* Shadow Extraction (Quest Count) */}
-              <ShadowExtraction completedQuests={quests.filter(q => q.completed).length} />
-
-          </div>
-
-          {/* --- MIDDLE COLUMN: HERO AVATAR (Width: 4/12) --- */}
-          <div className="lg:col-span-5 flex flex-col gap-6">
-              <div className="flex-grow min-h-[500px] relative">
-                  <PlayerAvatar stats={user.stats} onStatUpdate={updateStat} />
-              </div>
-              {/* Detailed Stats below avatar for central focus */}
-              <StatsGrid stats={user.stats} baselineStats={INITIAL_STATS} currentRank={user.rank} />
-          </div>
-
-          {/* --- RIGHT COLUMN: QUESTS & SKILLS (Width: 4/12) --- */}
-          <div className="lg:col-span-4 flex flex-col gap-6 h-full">
-              
-              {/* ACTIVE QUESTS (Top half) */}
-              <div className="flex flex-col h-[50%] min-h-[300px]">
-                
-                {/* NEW: JOB CHANGE WIDGET */}
-                <JobChangeWidget 
-                    currentLevel={user.level} 
-                    targetLevel={40} 
-                    jobClass={user.job_class || 'None'}
-                    onPromote={promoteJob}
-                />
-
-                <div className="mb-4 border-b border-gray-800 pb-2 flex items-center justify-between">
-                   <h2 className="text-xl font-orbitron text-white flex items-center gap-4">
-                      <span className="w-2 h-6 bg-neon-blue"></span>
-                      ACTIVE QUESTS
-                   </h2>
-                   
-                   <button 
-                     onClick={handleQuestGeneration}
-                     disabled={isGeneratingQuest}
-                     className={`text-[10px] font-mono border px-3 py-1 uppercase tracking-wider transition-all duration-300 flex items-center gap-2 ${
-                        isGeneratingQuest 
-                          ? 'border-gray-700 text-gray-500 cursor-wait'
-                          : 'border-neon-blue text-neon-blue hover:bg-neon-blue hover:text-black shadow-[0_0_10px_rgba(0,243,255,0.2)]'
-                     }`}
-                   >
-                     {isGeneratingQuest ? (
-                        <>
-                           <span className="animate-spin">⟳</span> SCANNING...
-                        </>
-                     ) : (
-                        <>
-                           <span>+</span> SYSTEM SCAN
-                        </>
-                     )}
-                   </button>
-                </div>
-
-                <div className="space-y-4 overflow-y-auto pr-2 custom-scrollbar flex-grow">
-                    {quests.map((quest) => (
-                        <motion.div
-                        key={quest.id}
-                        layout
-                        initial={{ opacity: 0, x: 20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        whileHover={{ scale: 1.01, x: 5 }}
-                        onClick={() => setSelectedQuestId(quest.id)}
-                        className={`cursor-pointer border-l-2 p-5 bg-black/40 hover:bg-neon-blue/5 transition-all relative overflow-hidden ${
-                            quest.type === 'SUDDEN' ? 'border-neon-purple' : 'border-neon-blue'
-                        }`}
-                        >
-                        {quest.completed && (
-                            <div className="absolute top-2 right-2 text-green-500 font-bold border border-green-500 px-1 text-[10px]">
-                                DONE
-                            </div>
-                        )}
-                        <div className={`text-[10px] font-mono mb-1 ${quest.type === 'SUDDEN' ? 'text-neon-purple' : 'text-neon-blue'}`}>
-                            [{quest.type === 'SUDDEN' ? 'URGENT' : 'DAILY'}]
-                        </div>
-                        <h3 className="font-orbitron text-white text-md font-bold mb-1">{quest.title}</h3>
-                        
-                        <div className="mt-2 flex justify-between items-end">
-                            <span className="text-xs text-gray-500 font-mono">Rank: <span className="text-white">{quest.difficulty}</span></span>
-                            <span className="text-xs text-gray-500 font-mono">XP: <span className="text-neon-blue">{quest.xpReward}</span></span>
-                        </div>
-                        </motion.div>
-                    ))}
-                </div>
-              </div>
-
-              {/* SKILL LIBRARY (Bottom half) */}
-              <div className="flex-grow h-[50%]">
-                 <SkillLibrary />
-              </div>
-
-          </div>
+            
         </div>
 
+        {/* --- QUEST MODAL --- */}
         <SystemModal isOpen={!!selectedQuestId} onClose={() => setSelectedQuestId(null)}>
           {selectedQuest && (
               <QuestCard 
@@ -877,21 +984,18 @@ const Dashboard: React.FC = () => {
   );
 };
 
-const AppContent: React.FC = () => {
-  return (
-    <Routes>
-      <Route path="/" element={<LandingPage />} />
-      <Route path="/dashboard" element={<Dashboard />} />
-    </Routes>
-  );
-};
-
 const App: React.FC = () => {
   return (
     <Router>
       <AuthProvider>
-        <SystemBackground />
-        <AppContent />
+        <div className="relative font-sans text-gray-100 selection:bg-neon-blue selection:text-black min-h-screen overflow-x-hidden">
+          <SystemBackground />
+          <Routes>
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </div>
       </AuthProvider>
     </Router>
   );

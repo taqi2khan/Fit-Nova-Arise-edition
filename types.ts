@@ -93,4 +93,6 @@ export interface AuthContextType {
   clearNotification: () => void;
   promoteJob: () => void; // New method
   updateStat: (stat: keyof UserStats, value: number) => void; // New method for manual/animated updates
+  theme: 'SYSTEM' | 'SHADOW' | 'RULER';
+  toggleTheme: () => void;
 }
