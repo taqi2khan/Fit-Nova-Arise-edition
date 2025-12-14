@@ -1,5 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { AudioService } from '../services/audioService';
 
 const BOOT_LOGS = [
   "INITIALIZING SYSTEM CORE...",
@@ -28,11 +30,13 @@ export const SystemBoot: React.FC<SystemBootProps> = ({ onComplete }) => {
     const logInterval = setInterval(() => {
       if (logIndex < BOOT_LOGS.length - 1) {
         setLogs(prev => [...prev, BOOT_LOGS[logIndex]]);
+        AudioService.playTyping(); // Play typing sound
         logIndex++;
         setProgress(prev => prev + 10);
       } else {
         clearInterval(logInterval);
         setPhase('LOGO');
+        AudioService.playSuccess(); // Boot sound
       }
     }, 150);
 
@@ -45,6 +49,7 @@ export const SystemBoot: React.FC<SystemBootProps> = ({ onComplete }) => {
       const timer = setTimeout(() => {
          setProgress(100);
          setPhase('ACCESS');
+         AudioService.playLevelUp(); // Access granted sound
       }, 1500);
       return () => clearTimeout(timer);
     }

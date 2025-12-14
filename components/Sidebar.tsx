@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
+import { AudioService } from '../services/audioService';
 
 interface SidebarProps {
   activeTab: string;
@@ -28,7 +29,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
         {menuItems.map((item) => (
           <button
             key={item.id}
-            onClick={() => onTabChange(item.id)}
+            onClick={() => {
+                AudioService.playClick();
+                onTabChange(item.id);
+            }}
+            onMouseEnter={() => AudioService.playHover()}
             className={`relative w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-300 group ${
               activeTab === item.id 
                 ? 'bg-white/10 text-neon-blue shadow-[inset_0_0_10px_rgba(0,243,255,0.1)]' 

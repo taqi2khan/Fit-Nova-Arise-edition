@@ -91,8 +91,10 @@ export interface AuthContextType {
   addQuest: (quest: Quest) => void;
   notify: (title: string, message: string, type?: SystemNotificationData['type']) => void;
   clearNotification: () => void;
-  promoteJob: () => void; // New method
-  updateStat: (stat: keyof UserStats, value: number) => void; // New method for manual/animated updates
+  promoteJob: () => void;
+  updateStat: (stat: keyof UserStats, value: number) => void;
   theme: 'SYSTEM' | 'SHADOW' | 'RULER';
   toggleTheme: () => void;
+  soundEnabled: boolean; // New prop
+  toggleSound: () => void; // New prop
 }

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { SystemBackground } from './components/SystemBackground';
@@ -10,6 +9,7 @@ import { User, Quest, SystemNotificationData, UserStats, Rank, SystemState, Auth
 import { MOCK_USER, MOCK_QUESTS, INITIAL_STATS } from './constants';
 import { motion, AnimatePresence } from 'framer-motion';
 import { generateSystemMessage, generateQuest } from './services/geminiService';
+import { AudioService } from './services/audioService'; // Import AudioService
 import { StatRadar } from './components/StatRadar';
 import { SystemLog } from './components/SystemLog';
 import { GlitchOverlay } from './components/GlitchOverlay';
@@ -48,6 +48,7 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   const [quests, setQuests] = useState<Quest[]>(MOCK_QUESTS);
   const [notification, setNotification] = useState<SystemNotificationData | null>(null);
   const [theme, setTheme] = useState<'SYSTEM' | 'SHADOW' | 'RULER'>('SYSTEM');
+  const [soundEnabled, setSoundEnabled] = useState(AudioService.isEnabled()); // Init from service/localstorage
   
   // Visual state for level up animation
   const [showLevelUp, setShowLevelUp] = useState(false);
@@ -66,14 +67,27 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   }, [theme]);
 
   const toggleTheme = () => {
+    AudioService.playClick();
     if (theme === 'SYSTEM') setTheme('SHADOW');
     else if (theme === 'SHADOW') setTheme('RULER');
     else setTheme('SYSTEM');
   };
 
+  const toggleSound = () => {
+      const newState = !soundEnabled;
+      setSoundEnabled(newState);
+      AudioService.setEnabled(newState);
+      if (newState) AudioService.playSuccess(); // Feedback
+  };
+
   const notify = (title: string, message: string, type: SystemNotificationData['type'] = 'INFO') => {
     const id = Date.now().toString();
     setNotification({ id, title, message, type });
+    if (type === 'SYSTEM_ALERT' || type === 'WARNING') {
+        AudioService.playError();
+    } else {
+        AudioService.playHover(); // Gentle notification sound
+    }
   };
 
   const clearNotification = () => setNotification(null);
@@ -83,9 +97,11 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
     const updatedUsers = [...registeredUsers, newUser];
     setRegisteredUsers(updatedUsers);
     localStorage.setItem('fitnova_users', JSON.stringify(updatedUsers));
+    AudioService.playSuccess();
   };
 
   const login = (identifier?: string, password?: string): Promise<boolean> => {
+    AudioService.playClick();
     return new Promise((resolve) => {
       // Simulation delay
       setTimeout(() => {
@@ -112,6 +128,7 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
         if (isMockMatch && password === "password") {
           setUser(MOCK_USER);
           notify("SYSTEM ACCESS GRANTED", "Welcome back, Player.\nSystem initialization complete.", "INFO");
+          AudioService.playSuccess();
           resolve(true);
           return;
         }
@@ -141,6 +158,7 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
              
              setUser(newUser);
              notify("SYSTEM INITIALIZATION", `Welcome, Hunter ${foundUser.name}.\nStarting Stats Assigned.`, "INFO");
+             AudioService.playSuccess();
              resolve(true);
              return;
         }
@@ -154,6 +172,7 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   };
 
   const logout = () => {
+      AudioService.playError(); // Power down sound
       setUser(null);
       setTheme('SYSTEM'); // Reset theme on logout
       notify("SYSTEM LOGOUT", "Goodbye, Hunter.", "INFO");
@@ -161,10 +180,12 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
 
   const addQuest = (quest: Quest) => {
     setQuests(prev => [quest, ...prev]);
+    AudioService.playSuccess(); // Quest received sound
   };
 
   // Updates the progress of a specific objective in a quest
   const updateQuestProgress = (questId: string, objectiveIndex: number, newCurrent: number) => {
+    AudioService.playClick();
     setQuests(prevQuests => prevQuests.map(q => {
       if (q.id !== questId) return q;
       
@@ -197,6 +218,8 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
     setQuests(prev => prev.map(q => q.id === id ? { ...q, completed: true } : q));
     
     if (user && !quest.completed) {
+        AudioService.playSuccess();
+
         // 1. Calculate New Stats
         const newStats = { ...user.stats };
         let rewardsLog = "";
@@ -239,6 +262,7 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
         if (totalXp >= currentLevelThreshold) {
             // Trigger Visual Animation
             setTimeout(() => {
+                AudioService.playLevelUp();
                 setShowLevelUp(true);
                 // Hide animation after 3.5s
                 setTimeout(() => setShowLevelUp(false), 3500);
@@ -263,6 +287,7 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   };
 
   const updateStat = (stat: keyof UserStats, value: number) => {
+    AudioService.playHover(); // Small sound for update
     setUser(prev => {
       if (!prev) return null;
       return {
@@ -278,6 +303,7 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   // JOB PROMOTION LOGIC
   const promoteJob = () => {
     if (user && user.level >= 40) {
+      AudioService.playLevelUp();
       setUser(prev => prev ? { ...prev, job_class: 'Shadow Monarch', title: 'The One Who Arises' } : null);
       setTheme('SHADOW');
       notify("JOB CHANGE SUCCESSFUL", "CLASS: SHADOW MONARCH\nTHEME UNLOCKED: SHADOW", "SYSTEM_ALERT");
@@ -286,6 +312,7 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
 
   // --- NEW: Helper to force update user stats for simulation ---
   const simulateFatigue = () => {
+      AudioService.playClick();
       setUser(prev => {
           if (!prev) return null;
           const isTired = prev.stats.fatigue_level >= 85;
@@ -302,13 +329,16 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
 
   // Helper to force level up for testing
   const debugLevelUp = () => {
+      AudioService.playClick();
       setShowLevelUp(true);
+      AudioService.playLevelUp();
       setTimeout(() => setShowLevelUp(false), 3500);
       setUser(prev => prev ? { ...prev, level: prev.level + 1 } : null);
   };
 
   // Helper to cycle ranks for testing
   const debugToggleRank = () => {
+    AudioService.playClick();
     setUser(prev => {
         if (!prev) return null;
         let nextRank = Rank.E;
@@ -336,7 +366,7 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   }, [user]);
 
   return (
-    <AuthContext.Provider value={{ user, quests, login, register, logout, completeQuest, updateQuestProgress, addQuest, notify, clearNotification, promoteJob, updateStat, theme, toggleTheme }}>
+    <AuthContext.Provider value={{ user, quests, login, register, logout, completeQuest, updateQuestProgress, addQuest, notify, clearNotification, promoteJob, updateStat, theme, toggleTheme, soundEnabled, toggleSound }}>
       <ParticleCursor />
       {children}
       <SystemNotification notification={notification} onClear={clearNotification} />
@@ -533,13 +563,21 @@ const LandingPage: React.FC = () => {
            className="mt-16 flex flex-col md:flex-row gap-6 justify-center"
         >
            <button 
-             onClick={() => setIsLoginOpen(true)}
+             onClick={() => {
+                 AudioService.playClick();
+                 setIsLoginOpen(true);
+             }}
+             onMouseEnter={() => AudioService.playHover()}
              className="px-8 py-3 bg-neon-blue text-black font-orbitron font-bold uppercase tracking-widest hover:bg-white transition-colors shadow-[0_0_20px_rgba(0,243,255,0.6)]"
            >
              Enter System
            </button>
            <button 
-             onClick={() => setIsSignupOpen(true)}
+             onClick={() => {
+                 AudioService.playClick();
+                 setIsSignupOpen(true);
+             }}
+             onMouseEnter={() => AudioService.playHover()}
              className="px-8 py-3 border border-neon-blue text-neon-blue font-orbitron font-bold uppercase tracking-widest hover:bg-neon-blue/10 transition-colors"
            >
              Become Hunter
@@ -650,7 +688,7 @@ const GlassCard: React.FC<{ children: React.ReactNode; className?: string; title
 );
 
 const Dashboard: React.FC = () => {
-  const { user, quests, completeQuest, updateQuestProgress, logout, addQuest, notify, promoteJob, updateStat, theme, toggleTheme } = useAuth();
+  const { user, quests, completeQuest, updateQuestProgress, logout, addQuest, notify, promoteJob, updateStat, theme, toggleTheme, soundEnabled, toggleSound } = useAuth();
   const [selectedQuestId, setSelectedQuestId] = useState<string | null>(null);
   const [isBooting, setIsBooting] = useState(true);
   const [isGeneratingQuest, setIsGeneratingQuest] = useState(false);
@@ -665,6 +703,7 @@ const Dashboard: React.FC = () => {
   const handleQuestGeneration = async () => {
     if (isGeneratingQuest) return;
     setIsGeneratingQuest(true);
+    AudioService.playClick();
     notify("SYSTEM SCAN", "Analyzing player biometrics...", "INFO");
 
     const partialQuest = await generateQuest(user);
@@ -759,7 +798,14 @@ const Dashboard: React.FC = () => {
                         {activeQuests.length > 0 ? (
                             <div className="flex-grow flex flex-col gap-4">
                                  {/* Quest Visual */}
-                                 <div className="flex-1 bg-gradient-to-br from-indigo-900/40 to-black rounded-xl border border-white/5 p-4 relative overflow-hidden group cursor-pointer" onClick={() => setSelectedQuestId(activeQuests[0].id)}>
+                                 <div 
+                                    className="flex-1 bg-gradient-to-br from-indigo-900/40 to-black rounded-xl border border-white/5 p-4 relative overflow-hidden group cursor-pointer" 
+                                    onClick={() => {
+                                        AudioService.playClick();
+                                        setSelectedQuestId(activeQuests[0].id)
+                                    }}
+                                    onMouseEnter={() => AudioService.playHover()}
+                                 >
                                      {/* Map-like patterns */}
                                      <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(circle, #4f46e5 1px, transparent 1px)', backgroundSize: '16px 16px' }}></div>
                                      
@@ -821,7 +867,15 @@ const Dashboard: React.FC = () => {
                     </div>
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         {quests.map(quest => (
-                            <div key={quest.id} onClick={() => setSelectedQuestId(quest.id)} className={`cursor-pointer group relative p-6 border rounded-xl overflow-hidden transition-all ${quest.completed ? 'border-green-500/30 bg-green-900/10' : 'border-white/10 bg-black/40 hover:border-neon-blue/50'}`}>
+                            <div 
+                                key={quest.id} 
+                                onClick={() => {
+                                    AudioService.playClick();
+                                    setSelectedQuestId(quest.id);
+                                }} 
+                                onMouseEnter={() => AudioService.playHover()}
+                                className={`cursor-pointer group relative p-6 border rounded-xl overflow-hidden transition-all ${quest.completed ? 'border-green-500/30 bg-green-900/10' : 'border-white/10 bg-black/40 hover:border-neon-blue/50'}`}
+                            >
                                 <div className="flex justify-between items-start mb-4">
                                     <h3 className={`font-orbitron font-bold text-lg ${quest.completed ? 'text-green-400' : 'text-white'}`}>{quest.title}</h3>
                                     <span className={`text-xs font-mono px-2 py-1 border ${quest.completed ? 'border-green-500 text-green-500' : 'border-neon-blue text-neon-blue'}`}>{quest.difficulty}-RANK</span>
@@ -901,6 +955,17 @@ const Dashboard: React.FC = () => {
                              </button>
                          </div>
                          
+                         {/* Sound Toggle */}
+                         <div className="flex items-center justify-between p-4 bg-white/5 border border-white/10 rounded-lg">
+                             <div>
+                                 <div className="text-white font-bold font-orbitron">AUDIO INTERFACE</div>
+                                 <div className="text-xs text-gray-500 font-mono">SYSTEM SOUNDS & ALERTS</div>
+                             </div>
+                             <button onClick={toggleSound} className={`px-4 py-2 border font-mono text-xs transition-colors ${soundEnabled ? 'border-neon-blue text-neon-blue' : 'border-gray-600 text-gray-500'}`}>
+                                 {soundEnabled ? 'ONLINE' : 'MUTED'}
+                             </button>
+                         </div>
+
                          <div className="flex items-center justify-between p-4 bg-white/5 border border-white/10 rounded-lg">
                              <div>
                                  <div className="text-white font-bold font-orbitron">NOTIFICATIONS</div>
@@ -988,14 +1053,12 @@ const App: React.FC = () => {
   return (
     <Router>
       <AuthProvider>
-        <div className="relative font-sans text-gray-100 selection:bg-neon-blue selection:text-black min-h-screen overflow-x-hidden">
-          <SystemBackground />
-          <Routes>
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </div>
+        <SystemBackground />
+        <Routes>
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
       </AuthProvider>
     </Router>
   );

@@ -1,5 +1,7 @@
+
 import React from 'react';
 import { motion, AnimatePresence, HTMLMotionProps } from 'framer-motion';
+import { AudioService } from '../services/audioService';
 
 // --- WRAPPERS ---
 
@@ -17,7 +19,7 @@ export const SystemModal: React.FC<SystemModalProps> = ({ children, isOpen, onCl
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
           onClick={(e) => {
             if (e.target === e.currentTarget && onClose) onClose();
           }}
@@ -149,6 +151,7 @@ export const SystemInput: React.FC<SystemInputProps> = ({ label, readOnly, error
         <motion.input 
           {...props}
           readOnly={readOnly}
+          onFocus={() => AudioService.playHover()}
           initial={false}
           animate={{
              boxShadow: error 
@@ -191,7 +194,7 @@ interface SystemButtonProps extends HTMLMotionProps<"button"> {
   variant?: 'primary' | 'secondary' | 'danger';
 }
 
-export const SystemButton: React.FC<SystemButtonProps> = ({ children, variant = 'primary', className = "", disabled, ...props }) => {
+export const SystemButton: React.FC<SystemButtonProps> = ({ children, variant = 'primary', className = "", disabled, onClick, ...props }) => {
   const variants = {
     primary: "bg-neon-blue/10 border border-neon-blue text-neon-blue hover:bg-neon-blue hover:text-black shadow-[0_0_15px_rgba(var(--neon-blue-rgb),0.3)]",
     secondary: "bg-transparent border border-gray-600 text-gray-400 hover:border-white hover:text-white",
@@ -206,6 +209,13 @@ export const SystemButton: React.FC<SystemButtonProps> = ({ children, variant = 
     <motion.button 
       whileHover={!disabled ? { scale: 1.02 } : {}}
       whileTap={!disabled ? { scale: 0.98 } : {}}
+      onMouseEnter={() => !disabled && AudioService.playHover()}
+      onClick={(e) => {
+          if(!disabled) {
+            AudioService.playClick();
+            if(onClick) onClick(e);
+          }
+      }}
       className={`w-full py-4 px-6 font-orbitron font-bold uppercase tracking-[0.15em] transition-all duration-300 ${activeClass} ${className}`}
       disabled={disabled}
       {...props}

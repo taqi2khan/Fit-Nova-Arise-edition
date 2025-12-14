@@ -1,7 +1,12 @@
+
 import React from 'react';
 import { motion } from 'framer-motion';
+import { useLocation } from 'react-router-dom';
 
 export const SystemBackground: React.FC = () => {
+  const location = useLocation();
+  const isDashboard = location.pathname === '/dashboard';
+
   return (
     <div className="fixed inset-0 z-[-1] bg-neon-dark overflow-hidden pointer-events-none select-none">
       
@@ -18,12 +23,12 @@ export const SystemBackground: React.FC = () => {
         }}
       />
 
-      {/* --- LAYER: COMMAND CENTER OVERLAY --- */}
+      {/* --- LAYER: COMMAND CENTER BASE OVERLAY (Global) --- */}
       <div className="absolute inset-0 pointer-events-none">
         {/* Top Left Bracket */}
         <div className="absolute top-0 left-0 w-32 md:w-64 h-32 md:h-64 border-l-2 border-t-2 border-neon-blue/20 rounded-tl-3xl opacity-50" />
         <div className="absolute top-6 left-6 md:top-8 md:left-8 font-mono text-[8px] md:text-[10px] text-neon-blue/40 tracking-[0.2em]">
-           CMD_CENTER_V4 // ONLINE
+           CMD_CENTER_V4 // {isDashboard ? 'ACTIVE' : 'STANDBY'}
         </div>
 
         {/* Top Right Bracket */}
@@ -58,6 +63,73 @@ export const SystemBackground: React.FC = () => {
         />
         <div className="absolute inset-4 md:inset-20 border border-neon-blue/5 rounded-3xl pointer-events-none" />
       </div>
+
+      {/* --- DASHBOARD SPECIFIC: TACTICAL HUD OVERLAY --- */}
+      {isDashboard && (
+        <div className="absolute inset-0 z-0 pointer-events-none">
+             {/* 1. Hexagonal Mesh Overlay */}
+             <div className="absolute inset-0 opacity-[0.03]" 
+                  style={{ 
+                     backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M30 0l25.98 15v30L30 60 4.02 45V15z' fill='none' stroke='%2300f3ff' stroke-width='1'/%3E%3C/svg%3E")`,
+                     backgroundSize: '60px 60px'
+                  }}
+             />
+
+             {/* 2. Side HUD Bars (Left) */}
+             <div className="absolute left-6 top-1/3 bottom-1/3 w-2 hidden lg:flex flex-col gap-1 justify-center opacity-30">
+                 {[...Array(30)].map((_, i) => (
+                     <motion.div 
+                         key={`l-bar-${i}`}
+                         className="w-full bg-neon-blue"
+                         initial={{ height: '2px', opacity: 0.1 }}
+                         animate={{ opacity: [0.1, 0.8, 0.1], width: ['100%', '50%', '100%'] }}
+                         transition={{ duration: 1 + Math.random() * 2, repeat: Infinity, delay: Math.random() }}
+                         style={{ height: '2px' }}
+                     />
+                 ))}
+             </div>
+
+             {/* 3. Side HUD Data (Right) */}
+             <div className="absolute right-6 top-1/3 bottom-1/3 w-16 hidden lg:flex flex-col gap-6 justify-center opacity-40 font-mono text-[8px] text-neon-blue text-right">
+                 {['CPU', 'MEM', 'NET', 'PWR', 'SHD'].map((label, i) => (
+                     <div key={label}>
+                         {label}
+                         <div className="h-1 bg-gray-800 w-full mt-1 overflow-hidden">
+                             <motion.div 
+                                className="h-full bg-neon-blue"
+                                animate={{ width: ['30%', '80%', '45%'] }}
+                                transition={{ duration: 2 + i, repeat: Infinity, ease: "linear" }}
+                             />
+                         </div>
+                     </div>
+                 ))}
+             </div>
+
+             {/* 4. Top Status Ticker */}
+             <div className="absolute top-[80px] left-0 right-0 h-8 flex items-center justify-center overflow-hidden opacity-50">
+                 <div className="w-1/2 h-[1px] bg-gradient-to-r from-transparent via-neon-blue to-transparent" />
+                 <div className="absolute flex gap-12 text-[9px] font-orbitron text-neon-blue tracking-[0.2em] animate-pulse whitespace-nowrap">
+                      <span>SYSTEM_STATUS: OPTIMAL</span>
+                      <span>THREAT_LEVEL: ZERO</span>
+                      <span>QUEST_DB: SYNCED</span>
+                      <span>CONNECTION: ENCRYPTED</span>
+                 </div>
+             </div>
+
+             {/* 5. Mini Radar (Bottom Right) */}
+             <div className="absolute right-8 bottom-8 w-24 h-24 rounded-full border border-neon-blue/20 hidden md:flex items-center justify-center bg-black/20 backdrop-blur-sm">
+                 <div className="absolute inset-0 rounded-full border border-neon-blue/10 scale-75"></div>
+                 <div className="absolute inset-0 rounded-full border border-neon-blue/10 scale-50"></div>
+                 <div className="absolute w-[1px] h-full bg-neon-blue/20"></div>
+                 <div className="absolute h-[1px] w-full bg-neon-blue/20"></div>
+                 <motion.div 
+                     className="w-full h-full rounded-full bg-[conic-gradient(from_0deg,transparent_0deg,transparent_270deg,rgba(0,243,255,0.3)_360deg)]"
+                     animate={{ rotate: 360 }}
+                     transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+                 />
+             </div>
+        </div>
+      )}
 
       {/* --- LAYER 2: ROTATING HUD ELEMENTS (Central) --- */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.05]">

@@ -3,6 +3,7 @@ import React, { useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { User } from '../types';
 import { generateHunterProfileImage } from '../services/geminiService';
+import { AudioService } from '../services/audioService';
 import { SystemModal, SystemWindow, SystemInput, SystemButton } from './HoloUI';
 
 interface HunterIDCardProps {
@@ -54,6 +55,7 @@ export const HunterIDCard: React.FC<HunterIDCardProps> = ({ user }) => {
 
   const handleOpenModal = (e: React.MouseEvent) => {
     e.stopPropagation();
+    AudioService.playClick();
     setIsModalOpen(true);
   };
 
@@ -102,14 +104,16 @@ export const HunterIDCard: React.FC<HunterIDCardProps> = ({ user }) => {
 
   return (
     <>
+    {/* SMALL CARD (CLICK TRIGGER) */}
     <div style={{ perspective: 1000 }} className="w-full h-auto mb-6 max-w-md mx-auto relative z-10">
         <motion.div
             ref={cardRef}
+            onClick={handleOpenModal}
             onMouseMove={handleMouseMove}
             onMouseLeave={handleMouseLeave}
             animate={{ rotateX, rotateY }}
             transition={{ type: "spring", stiffness: 300, damping: 20 }}
-            className="relative w-full aspect-[1.586/1] bg-gray-900 rounded-xl overflow-hidden shadow-2xl group select-none"
+            className="relative w-full aspect-[1.586/1] bg-gray-900 rounded-xl overflow-hidden shadow-2xl group select-none cursor-pointer hover:shadow-[0_0_30px_rgba(0,243,255,0.3)] transition-shadow duration-300"
             style={{ 
                 transformStyle: 'preserve-3d',
                 boxShadow: '0 20px 40px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.1)' 
@@ -180,24 +184,6 @@ export const HunterIDCard: React.FC<HunterIDCardProps> = ({ user }) => {
                             </div>
                          )}
 
-                         {/* AI Generate Button (Hover) */}
-                         <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover/avatar:opacity-100 transition-opacity">
-                             <button 
-                                onClick={handleOpenModal}
-                                disabled={isGenerating}
-                                className="text-[9px] font-mono text-white border border-white/50 px-1 py-0.5 hover:bg-white/20 uppercase"
-                             >
-                                {isGenerating ? 'SCANNING...' : '[UPDATE]'}
-                             </button>
-                         </div>
-                         
-                         {/* Scanline Overlay (While Generating) */}
-                         {isGenerating && (
-                            <div className="absolute inset-0 bg-neon-blue/20 animate-pulse z-10 flex items-center justify-center">
-                                <div className="w-full h-[2px] bg-neon-blue animate-scanline" />
-                            </div>
-                         )}
-
                          {/* Hologram Overlay on photo */}
                          <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-30 mix-blend-overlay pointer-events-none"></div>
                     </div>
@@ -249,65 +235,71 @@ export const HunterIDCard: React.FC<HunterIDCardProps> = ({ user }) => {
         </motion.div>
     </div>
 
-    {/* CUSTOMIZATION MODAL */}
+    {/* LARGE MODAL (POP-UP MODE) */}
     <SystemModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
         <SystemWindow 
-            title="HUNTER ID PROFILE" 
-            subtitle="[BIOMETRIC DATA UPDATE]"
+            title="HUNTER DOSSIER" 
+            subtitle={`ID: ${user.id} // [SECURE ACCESS]`}
             footer={
                 <div className="flex gap-4 px-4 w-full">
                     <SystemButton variant="secondary" onClick={() => setIsModalOpen(false)}>
-                        {profileImage ? 'SAVE & CLOSE' : 'CANCEL'}
+                        CLOSE FILE
                     </SystemButton>
                     <SystemButton onClick={handleGeneratePhoto} disabled={isGenerating}>
-                        {isGenerating ? 'GENERATING...' : (profileImage ? 'REGENERATE' : 'GENERATE PHOTO')}
+                        {isGenerating ? 'BIOMETRIC SCANNING...' : 'GENERATE SNAPSHOT'}
                     </SystemButton>
                 </div>
             }
         >
-            <div className="space-y-6">
-                {/* PREVIEW */}
-                <div className="flex justify-center">
-                    <div className={`w-32 h-40 bg-black border-2 ${visuals.border} relative overflow-hidden shadow-[0_0_20px_rgba(0,0,0,0.5)]`}>
-                        {profileImage ? (
-                            <img src={profileImage} alt="Profile" className="w-full h-full object-cover" />
-                        ) : (
-                            <div className="w-full h-full flex flex-col items-center justify-center text-gray-600 bg-gray-900">
-                                <span className="text-4xl opacity-20">?</span>
-                                <span className="text-[8px] font-mono mt-2">NO DATA</span>
-                            </div>
-                        )}
-                        
-                        {/* Scanning Overlay */}
-                        {isGenerating && (
-                             <div className="absolute inset-0 bg-neon-blue/10 animate-pulse flex items-center justify-center">
-                                 <div className="w-full h-[2px] bg-neon-blue animate-scanline shadow-[0_0_10px_#00f3ff]" />
-                             </div>
-                        )}
+            <div className="flex flex-col md:flex-row gap-6">
+                {/* LEFT: LARGE PHOTO VISUALIZER */}
+                <div className="w-full md:w-5/12 relative aspect-[3/4] bg-black border-2 border-gray-800 rounded-sm overflow-hidden group shadow-[0_0_30px_rgba(0,0,0,0.8)]">
+                    {profileImage ? (
+                        <img src={profileImage} alt="Profile" className="w-full h-full object-cover" />
+                    ) : (
+                        <div className="w-full h-full flex flex-col items-center justify-center text-gray-600 bg-gray-900/50">
+                            <span className="text-5xl opacity-20 mb-2">?</span>
+                            <span className="text-[9px] font-mono tracking-widest">NO BIOMETRIC DATA</span>
+                        </div>
+                    )}
+                    
+                    {/* Scanning Overlay (Active) */}
+                    {isGenerating && (
+                         <div className="absolute inset-0 bg-black/80 z-20 flex flex-col items-center justify-center">
+                             <div className="w-full h-[2px] bg-neon-blue animate-scanline shadow-[0_0_15px_#00f3ff]" />
+                             <div className="text-neon-blue font-mono text-xs animate-pulse mt-4">PROCESSING...</div>
+                         </div>
+                    )}
+
+                    {/* Passive Grid Overlay */}
+                    <div className="absolute inset-0 pointer-events-none opacity-20 bg-[linear-gradient(rgba(0,243,255,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(0,243,255,0.1)_1px,transparent_1px)] bg-[size:20px_20px]" />
+                </div>
+
+                {/* RIGHT: CONFIG & DETAILS */}
+                <div className="flex-1 flex flex-col gap-4">
+                    <div className="border-b border-gray-800 pb-2">
+                        <h3 className="text-2xl text-white font-orbitron font-bold uppercase">{user.name}</h3>
+                        <div className="text-neon-blue font-mono text-xs tracking-[0.2em]">{user.title}</div>
                     </div>
-                </div>
 
-                {/* CONTROLS */}
-                <div>
-                    <SystemInput 
-                        label="APPEARANCE DETAILS" 
-                        placeholder="e.g. Silver hair, glowing red eyes, black hoodie..." 
-                        value={customAppearance}
-                        onChange={(e) => setCustomAppearance(e.target.value)}
-                        disabled={isGenerating}
-                    />
-                    <p className="text-[10px] text-gray-500 font-mono mt-[-10px]">
-                        * Leave blank to let the System decide based on your Rank & Class.
-                    </p>
-                </div>
+                    <div className="grid grid-cols-2 gap-4 text-xs font-mono text-gray-400 bg-white/5 p-4 rounded border border-white/10">
+                        <div>RANK: <span className="text-white font-bold">{user.rank}</span></div>
+                        <div>LEVEL: <span className="text-white font-bold">{user.level}</span></div>
+                        <div>CLASS: <span className="text-white font-bold">{user.job_class}</span></div>
+                        <div>POWER: <span className="text-white font-bold">{user.stats.power_index}</span></div>
+                    </div>
 
-                <div className="bg-white/5 p-3 border border-white/10 rounded">
-                    <h4 className="text-neon-blue font-orbitron text-xs mb-2">CURRENT METADATA</h4>
-                    <div className="grid grid-cols-2 gap-2 text-[10px] font-mono text-gray-400">
-                        <div>NAME: <span className="text-white">{user.name}</span></div>
-                        <div>RANK: <span className="text-white">{user.rank}</span></div>
-                        <div>CLASS: <span className="text-white">{user.job_class}</span></div>
-                        <div>LEVEL: <span className="text-white">{user.level}</span></div>
+                    <div className="mt-auto pt-4">
+                        <SystemInput 
+                            label="VISUAL TRAITS CONFIGURATION" 
+                            placeholder="e.g. Glowing blue eyes, silver hair, tactical gear..." 
+                            value={customAppearance}
+                            onChange={(e) => setCustomAppearance(e.target.value)}
+                            disabled={isGenerating}
+                        />
+                        <p className="text-[9px] text-gray-500 font-mono mt-[-10px] pl-1">
+                            * System will synthesize ID photo based on these parameters + Rank data.
+                        </p>
                     </div>
                 </div>
             </div>
