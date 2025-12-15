@@ -1,6 +1,7 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
 import { User, Quest, SystemState } from "../types";
+import { isHighRank, isMidRank } from "../rankUtils";
 
 const initGenAI = () => {
   const apiKey = process.env.API_KEY;
@@ -216,13 +217,13 @@ export const generateHunterProfileImage = async (user: User, customDetails?: str
   if (!ai) return null;
 
   try {
-    const isHighRank = user.rank.includes('S') || user.rank.includes('National');
-    const isMidRank = user.rank.includes('A') || user.rank.includes('B');
-    
+    const highRank = isHighRank(user.rank);
+    const midRank = isMidRank(user.rank);
+
     let baseAppearance = "";
-    if (isHighRank) {
+    if (highRank) {
         baseAppearance = "Legendary hunter, glowing magical aura, confident and menacing expression, intricate glowing futuristic armor, god-tier power radiating, glowing eyes.";
-    } else if (isMidRank) {
+    } else if (midRank) {
         baseAppearance = "Experienced hunter, solid combat gear, focused expression, holding a weapon, subtle magical aura.";
     } else {
         baseAppearance = "Novice hunter, wearing a simple track suit or basic light armor, determined but rookie appearance, sweating slightly.";

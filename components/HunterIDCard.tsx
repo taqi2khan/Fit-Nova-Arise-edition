@@ -4,6 +4,8 @@ import { motion } from 'framer-motion';
 import { User } from '../types';
 import { generateHunterProfileImage } from '../services/geminiService';
 import { AudioService } from '../services/audioService';
+import { getRankShortLabel } from '../rankUtils';
+import { HunterAvatar, getHunterAvatarTheme } from './HunterAvatar';
 import { SystemModal, SystemWindow, SystemInput, SystemButton } from './HoloUI';
 
 interface HunterIDCardProps {
@@ -70,37 +72,8 @@ export const HunterIDCard: React.FC<HunterIDCardProps> = ({ user }) => {
     setIsGenerating(false);
   };
 
-  // --- RANK BASED VISUALS ---
-  const getRankVisuals = (rank: string) => {
-    const r = rank.toUpperCase();
-    if (r.includes('NATIONAL') || r.includes('S')) {
-        return {
-            bg: "bg-gradient-to-b from-purple-900 to-black",
-            eyes: "text-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,1)]",
-            aura: "shadow-[inset_0_0_20px_rgba(168,85,247,0.5)]",
-            iconColor: "text-yellow-500",
-            border: "border-yellow-500/50"
-        };
-    } else if (r.includes('A') || r.includes('B')) {
-        return {
-            bg: "bg-gradient-to-b from-blue-900 to-black",
-            eyes: "text-cyan-400 drop-shadow-[0_0_5px_rgba(34,211,238,1)]",
-            aura: "shadow-[inset_0_0_15px_rgba(59,130,246,0.5)]",
-            iconColor: "text-gray-200",
-            border: "border-blue-400/50"
-        };
-    } else {
-        return {
-            bg: "bg-gradient-to-b from-gray-800 to-black",
-            eyes: "text-gray-500",
-            aura: "",
-            iconColor: "text-gray-500",
-            border: "border-gray-600"
-        };
-    }
-  };
-
-  const visuals = getRankVisuals(user.rank);
+  const avatarTheme = getHunterAvatarTheme(user.rank);
+  const rankLabel = getRankShortLabel(user.rank);
 
   return (
     <>
@@ -166,27 +139,12 @@ export const HunterIDCard: React.FC<HunterIDCardProps> = ({ user }) => {
                 {/* MAIN BODY */}
                 <div className="flex gap-4 mt-2 flex-grow items-center">
                     {/* Avatar Frame - Rank Based */}
-                    <div className={`relative w-20 h-24 rounded-sm overflow-hidden shadow-inner flex-shrink-0 border ${visuals.border} ${visuals.aura} group/avatar`}>
-                         {/* Photo or Placeholder */}
-                         {profileImage ? (
-                             <img src={profileImage} alt="Hunter Profile" className="w-full h-full object-cover" />
-                         ) : (
-                            <div className={`absolute inset-0 flex items-end justify-center ${visuals.bg}`}>
-                                  {/* Simple Silhouette */}
-                                  <svg className={`w-16 h-16 mb-[-5px] ${visuals.iconColor}`} fill="currentColor" viewBox="0 0 24 24">
-                                    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
-                                  </svg>
-                                  {/* Glowing Eyes Effect */}
-                                  <div className="absolute top-[35%] left-[35%] w-[30%] h-[10%] flex justify-between px-1">
-                                      <div className={`w-1.5 h-1.5 rounded-full ${visuals.eyes} animate-pulse`} />
-                                      <div className={`w-1.5 h-1.5 rounded-full ${visuals.eyes} animate-pulse`} />
-                                  </div>
-                            </div>
-                         )}
-
-                         {/* Hologram Overlay on photo */}
-                         <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-30 mix-blend-overlay pointer-events-none"></div>
-                    </div>
+                    <HunterAvatar
+                      rank={user.rank}
+                      imageSrc={profileImage}
+                      className="w-20 h-24 flex-shrink-0"
+                      roundedClassName="rounded-sm"
+                    />
 
                     {/* Text Details */}
                     <div className="flex flex-col justify-between w-full h-full py-1">
@@ -201,8 +159,8 @@ export const HunterIDCard: React.FC<HunterIDCardProps> = ({ user }) => {
                         <div className="grid grid-cols-2 gap-2 mt-2">
                              <div>
                                 <div className="text-[7px] text-gray-400 uppercase tracking-widest">Rank</div>
-                                <div className={`text-lg font-black font-orbitron italic leading-none mt-0.5 ${user.rank.includes('S') || user.rank.includes('National') ? 'text-yellow-400 drop-shadow-[0_0_5px_rgba(250,204,21,0.5)]' : 'text-neon-blue'}`}>
-                                    {user.rank.includes('National') ? 'NAT' : user.rank.split('-')[0]}
+                                <div className={`text-lg font-black font-orbitron italic leading-none mt-0.5 ${avatarTheme.rankTextClass}`}>
+                                    {rankLabel}
                                 </div>
                              </div>
                              <div>
@@ -253,27 +211,31 @@ export const HunterIDCard: React.FC<HunterIDCardProps> = ({ user }) => {
         >
             <div className="flex flex-col md:flex-row gap-6">
                 {/* LEFT: LARGE PHOTO VISUALIZER */}
-                <div className="w-full md:w-5/12 relative aspect-[3/4] bg-black border-2 border-gray-800 rounded-sm overflow-hidden group shadow-[0_0_30px_rgba(0,0,0,0.8)]">
-                    {profileImage ? (
-                        <img src={profileImage} alt="Profile" className="w-full h-full object-cover" />
-                    ) : (
-                        <div className="w-full h-full flex flex-col items-center justify-center text-gray-600 bg-gray-900/50">
-                            <span className="text-5xl opacity-20 mb-2">?</span>
-                            <span className="text-[9px] font-mono tracking-widest">NO BIOMETRIC DATA</span>
-                        </div>
-                    )}
-                    
-                    {/* Scanning Overlay (Active) */}
-                    {isGenerating && (
-                         <div className="absolute inset-0 bg-black/80 z-20 flex flex-col items-center justify-center">
-                             <div className="w-full h-[2px] bg-neon-blue animate-scanline shadow-[0_0_15px_#00f3ff]" />
-                             <div className="text-neon-blue font-mono text-xs animate-pulse mt-4">PROCESSING...</div>
-                         </div>
-                    )}
+                <HunterAvatar
+                  rank={user.rank}
+                  imageSrc={profileImage}
+                  className="w-full md:w-5/12 aspect-[3/4] group shadow-[0_0_30px_rgba(0,0,0,0.8)]"
+                  roundedClassName="rounded-sm"
+                  showRankBadge={false}
+                >
+                  {!profileImage && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 text-gray-300">
+                      <span className="text-5xl opacity-20 mb-2">?</span>
+                      <span className="text-[9px] font-mono tracking-widest">NO BIOMETRIC DATA</span>
+                    </div>
+                  )}
 
-                    {/* Passive Grid Overlay */}
-                    <div className="absolute inset-0 pointer-events-none opacity-20 bg-[linear-gradient(rgba(0,243,255,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(0,243,255,0.1)_1px,transparent_1px)] bg-[size:20px_20px]" />
-                </div>
+                  {/* Scanning Overlay (Active) */}
+                  {isGenerating && (
+                    <div className="absolute inset-0 bg-black/80 z-20 flex flex-col items-center justify-center">
+                      <div className="w-full h-[2px] bg-neon-blue animate-scanline shadow-[0_0_15px_#00f3ff]" />
+                      <div className="text-neon-blue font-mono text-xs animate-pulse mt-4">PROCESSING...</div>
+                    </div>
+                  )}
+
+                  {/* Passive Grid Overlay */}
+                  <div className="absolute inset-0 pointer-events-none opacity-20 bg-[linear-gradient(rgba(0,243,255,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(0,243,255,0.1)_1px,transparent_1px)] bg-[size:20px_20px]" />
+                </HunterAvatar>
 
                 {/* RIGHT: CONFIG & DETAILS */}
                 <div className="flex-1 flex flex-col gap-4">
